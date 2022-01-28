@@ -1,0 +1,8 @@
+*.png
+*.jpg
+*.jpeg
+.vscode/
+tracker_visp/yolact_cpu/
+tracker_visp/src/__pycache__/*
+tracker_visp/learning/
+tracker_visp/.vscode/
