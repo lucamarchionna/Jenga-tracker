@@ -1,0 +1,5 @@
+sensor_msgs/Image image
+sensor_msgs/CameraInfo camInfo
+---
+std_msgs/String caoFilePath
+geometry_msgs/Transform initPose

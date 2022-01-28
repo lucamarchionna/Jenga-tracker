@@ -1,0 +1,6 @@
+5                 # Number of points
+-0.0375  0.0225    0.0       # Block 5 Point 3
+-0.0375  -0.0075   0.0        # Block 2 Point 1
+-0.0375  -0.0075   0.075     # Block 2 Point 4
+-0.0375  -0.0225   0.025     # Block 4 Point 1
+0.0375   -0.0225   0.0       # Block 4 Point 5

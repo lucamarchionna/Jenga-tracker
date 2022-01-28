@@ -1,0 +1,12 @@
+<?xml version="1.0" ?>
+<launch>
+
+    <!-- Starts the learning configuration and tracking consecutively  -->
+   
+    <node name="tracker_params" pkg="tracker_visp" type="tracker_params" output="screen">
+       <param name="learn" value="False" />
+       <param name="auto_init" value="True" />
+       <param name="_pose_init" value="True" />
+    </node> 
+         
+</launch>

@@ -1,0 +1,18 @@
+V1
+load("/home/lucamark/catkin_ws/src/tracker_visp/model/blocks_cao/jengaRightZend.cao", t=[0.0; 0.0; 0.0], tu=[0.0; 0.0; 0.0])
+load("/home/lucamark/catkin_ws/src/tracker_visp/model/blocks_cao/jengaCenterZend.cao", t=[-0.025; 0.0; 0.0], tu=[0.0; 0.0; 0.0])
+load("/home/lucamark/catkin_ws/src/tracker_visp/model/blocks_cao/jengaLeftZend.cao", t=[-0.05; 0.0; 0.0], tu=[0.0; 0.0; 0.0])
+load("/home/lucamark/catkin_ws/src/tracker_visp/model/blocks_cao/jengaRightZend.cao", t=[-0.0625; 0.015; 0.0125], tu=[0.0; 1.5708; -0.0])
+###############################################################
+# 3D Points
+0
+# 3D Lines
+0 # Number of lines
+# Faces from 3D lines
+0 # Number of faces
+# Faces from 3D points
+0
+# 3D cylinders
+0 # Number of cylinders
+# 3D circles
+0 # Number of circles
