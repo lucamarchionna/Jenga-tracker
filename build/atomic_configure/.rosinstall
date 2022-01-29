@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/giulio/catkin_ws/src/Jenga-tracker/build/devel/setup.sh
