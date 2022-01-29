@@ -1,0 +1,8 @@
+*.png
+*.jpg
+*.jpeg
+yolact_cpu
+src/__pycache__/*
+learning/
+.vscode
+build
