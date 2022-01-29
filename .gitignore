@@ -2,8 +2,8 @@
 *.jpg
 *.jpeg
 .vscode/
-Jenga-tracker/yolact_cpu/
+Jenga-tracker/yolact_cpu
 Jenga-tracker/src/__pycache__/*
 Jenga-tracker/learning/
 Jenga-tracker/.vscode/
-Jenga-tracker/build/
+Jenga-tracker/build
