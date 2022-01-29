@@ -27,6 +27,9 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   pcl_conversions
   pcl_msgs
+  
+  moveit_ros_planning_interface 
+  moveit_ros_move_group
 
   tf2
   tf2_ros
@@ -203,6 +206,23 @@ target_link_libraries(rotating_base
 )
 
 add_dependencies(rotating_base
+  ${catkin_EXPORTED_TARGETS}
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+)
+
+#tracker+pbvs
+add_executable(visualServo
+  src/visual_servo.cpp
+)
+
+target_link_libraries(visualServo
+  ${catkin_LIBRARIES}
+  ${VISP_LIBRARIES}
+  ${realsense2_LIBRARY}
+  ${PCL_LIBRARIES}
+)
+
+add_dependencies(visualServo
   ${catkin_EXPORTED_TARGETS}
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
 )
