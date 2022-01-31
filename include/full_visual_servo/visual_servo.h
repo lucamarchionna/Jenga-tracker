@@ -7,7 +7,6 @@
 #include <visp3/core/vpIoTools.h>
 #include <visp3/core/vpXmlParserCamera.h>
 #include <visp3/core/vpHomogeneousMatrix.h>
-#include <visp3/gui/vpDisplayGDI.h>
 #include <visp3/gui/vpDisplayOpenCV.h>
 #include <visp3/mbt/vpMbGenericTracker.h>
 #include <visp3/sensor/vpRealSense2.h>
@@ -22,8 +21,6 @@
 #include <visp3/io/vpVideoWriter.h>
 #include <visp3/core/vpImageDraw.h>
 #include <visp3/core/vpFont.h>
-#include <visp3/gui/vpDisplayX.h>
-#include <visp3/gui/vpProjectionDisplay.h>
 // TEMP
 
 #include "tf2_msgs/TFMessage.h"
@@ -52,8 +49,8 @@
 #include <geometry_msgs/TwistStamped.h>
 
 #include <eigen_conversions/eigen_msg.h>
-//#include <std_msgs/Bool.h>
-//#include <std_msgs/String.h>
+#include <std_msgs/Bool.h>
+#include <std_msgs/String.h>
 #include <std_msgs/UInt16.h>
 
 
@@ -138,8 +135,6 @@ class visual_servoing
         
         vpImage<unsigned char> Iint;
         vpImage<unsigned char> Iext;
-        vpDisplayX displayInt, displayExt;
-        vpProjectionDisplay externalview;
 
         geometry_msgs::TwistStamped velocityData;
         double error;

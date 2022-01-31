@@ -36,6 +36,11 @@ find_package(catkin REQUIRED COMPONENTS
   #tf2_eigen
 )
 
+add_message_files(
+  FILES
+  ReferenceBlock.msg
+)
+
 add_service_files(
   FILES
   YolactInitializeCaoPose.srv
