@@ -123,6 +123,11 @@ class Blocks_group():
         self.caseD=False
         self.caseB=False
         self.caseC=False
+        self.caseH=False
+        self.caseE=False
+        self.caseG=False
+        self.caseF=False
+
         #type1: 
         if self.rightIdx[0]!=-1 and self.rightIdx[1]==-1 and self.leftIdx[0]==-1:
             self.img_cross=self.start_block.draw_additional_test_point(self.img_cross,test_upleft0,self.start_block.centroid,cv2color=[255,0,0])
@@ -162,12 +167,8 @@ class Blocks_group():
                         # sure to be case C
                         self.caseC=True
         
-        self.caseH=False
-        self.caseE=False
-        self.caseG=False
-        self.caseF=False
-        #type2: 
-        if self.leftIdx[0]!=-1 and self.leftIdx[1]==-1 and self.rightIdx[0]==-1:
+        elif self.leftIdx[0]!=-1 and self.leftIdx[1]==-1 and self.rightIdx[0]==-1:
+            #type2: 
             self.img_cross=self.start_block.draw_additional_test_point(self.img_cross,test_upright0,self.start_block.centroid,cv2color=[255,0,0])
             self.img_cross=self.start_block.draw_additional_test_point(self.img_cross,test_downright0,self.start_block.centroid,cv2color=[67,0,0])
             self.img_cross=self.start_block.draw_additional_test_point(self.img_cross,test_upleft1,self.start_block.centroid,cv2color=[0,0,255])
@@ -184,7 +185,7 @@ class Blocks_group():
                         self.caseH=False
             if not self.caseH:
                 # search case E
-                self.caseD=True
+                self.caseE=True
                 if self.upIdx!=-1:
                     for block_test in blocks_list:
                         if block_test.idx!=self.startIdx and block_test.idx!=self.leftIdx[0]:
