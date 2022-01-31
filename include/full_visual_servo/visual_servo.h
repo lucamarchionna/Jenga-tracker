@@ -62,7 +62,7 @@ class visual_servoing
     public:
         visual_servoing(ros::NodeHandle& nh);
         //~visual_servoing(); //destroy when class ends
-        ~visual_servoing(); //destroy when class ends
+        // ~visual_servoing(); //destroy when class ends
         int init_matrices();
         void init_servo();
         void stopping_criteria();
