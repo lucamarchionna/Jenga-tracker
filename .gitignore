@@ -6,3 +6,6 @@ src/__pycache__/*
 learning/
 .vscode
 build
+model/
+!model/blocks_cao
+!model/jenga_zEnd
