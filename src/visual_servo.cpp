@@ -10,9 +10,10 @@ visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh)
   trackerEstimation = node_handle.advertise<geometry_msgs::Pose>("/pose_estimation", 1);
   velocityInput = node_handle.advertise<geometry_msgs::TwistStamped>("/servo_server/delta_twist_cmds", 1);
   startingPos = node_handle.advertise<geometry_msgs::PoseStamped>("/initialGuestPos", 1);
-  servoPub = node_handle.advertise<std_msgs::UInt16>("/servo", 1);
-  //subLearning = node_handle.subscribe("/tracker_params/learning_phase", 1, &visual_servoing::learningCallback, this);
-
+  servoPub = node_handle.advertise<tracker_visp::angle_velocity>("/servo", 1);
+  subLearning = node_handle.subscribe("/tracker_params/learning_phase", 1, &visual_servoing::learningCallback, this);
+  // To wait a bit before publishing to /servo
+  ros::Duration(1.0).sleep();
   init_parameters();
   init_matrices();
   init_servo();
@@ -158,33 +159,34 @@ geometry_msgs::TransformStamped visual_servoing::toMoveit(vpHomogeneousMatrix da
   return target;
 }
 
-// void visual_servoing::learningCallback(const std_msgs::Bool::ConstPtr& msg)
-// { 
-//   opt_learn = false;
-//   learn_position = false;
-
-//   if (!opt_auto_init) {
-//     opt_learn = msg->data;
-//   }
-
-//   if (opt_learn) {
-//     learn_position = true;
-//   }
-
-// }
-
-void visual_servoing::learningCallback(const bool msg) {
-
+void visual_servoing::learningCallback(const std_msgs::Bool::ConstPtr& msg)
+{ 
   opt_learn = false;
+  learn_position = false;
+
+  if (!opt_auto_init) {
+    opt_learn = msg->data;
+  }
+
+  if (opt_learn) {
+    learn_position = true;
+  }
+
 }
+
+// void visual_servoing::learningCallback(const bool msg) {
+
+//   opt_learn = false;
+// }
 
 void visual_servoing::init_parameters()
 {
-  std_msgs::UInt16 angle_to_servo;
-  angle_to_servo.data = 90;	//degrees, final angle
-  servoPub.publish(angle_to_servo);
+  tracker_visp::angle_velocity angleVel_to_servo;
+  angleVel_to_servo.angle = 90;	//degrees, setup angle
+  angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
+  servoPub.publish(angleVel_to_servo);
   //Settings  
-  tracker_path = ros::package::getPath("tracker_vgithisp");
+  tracker_path = ros::package::getPath("tracker_visp");
   opt_config = tracker_path + "/trackers/jenga_tracker_params.xml";
   opt_model = tracker_path + "/model/file_cao.cao";
   opt_init = tracker_path + "/model/jenga_single.init";
@@ -206,10 +208,12 @@ void visual_servoing::init_parameters()
   catch (const vpException &e) {
     std::cout << "Catch an exception: " << e.what() << std::endl;
     std::cout << "Check if the Realsense camera is connected..." << std::endl;
+    return;
   }
   catch (const rs2::error &e) {
     std::cout << "Catch an exception: " << e.what() << std::endl;
     std::cout << "Check if the Realsense camera is connected..." << std::endl;
+    return;
   }
 
   cam_color = realsense.getCameraParameters(RS2_STREAM_COLOR, vpCameraParameters::perspectiveProjWithoutDistortion);
@@ -236,7 +240,7 @@ void visual_servoing::init_parameters()
   
 
   // [Acquire stream and initialize displays]
-  while (true) {
+  while (node_handle.ok()) {
     realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, NULL, NULL);
 
     vpDisplay::display(I_color);
@@ -433,31 +437,64 @@ void visual_servoing::learning_process()
   } 
 
   else if (opt_yolact_init) {
-    sensor_msgs::Image sensor_image = visp_bridge::toSensorMsgsImage(I_color);
-	  sensor_msgs::CameraInfo sensor_camInfo = visp_bridge::toSensorMsgsCameraInfo(cam_color,width,height);
-    // Send image and cam par to service, where Python node responds with cao_file and pose
-    ROS_INFO("Subscribing to service...");
-    ros::service::waitForService("/Pose_cao_initializer");
-    srv.request.image = sensor_image;
-    srv.request.camInfo = sensor_camInfo;
-    ROS_INFO("Starting call to service..");
-    if (client.call(srv))
-    {
-      ROS_INFO("Response from service..");
-      opt_model = srv.response.caoFilePath.data;
-      geometry_msgs::Transform initPose = srv.response.initPose;
-      cMo = visp_bridge::toVispHomogeneousMatrix(initPose);
-      tracker->loadModel(opt_model, opt_model);
-      mapOfCameraPoses["Camera1"] = cMo;
-      mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
-      tracker->initFromPose(mapOfImages,mapOfCameraPoses);
-    }
+  	// [Acquire stream and initialize displays]
+    bool terminated = false;
+    vpMouseButton::vpMouseButtonType button;
+    opt_model="";
+      while (!terminated && (opt_model=="") && node_handle.ok()) {
+      try{
+        realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, NULL, NULL);
+      }
+      catch (const rs2::error &e){
+          std::cout << "Catch an exception: " << e.what() << std::endl;
+          return;
+      }
 
-    else{
-      ROS_ERROR("Cannot receive response from server");
+      vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
+      vpImageConvert::convert(I_depth_gray,I_depth_color);
+      mapOfImages["Camera1"] = &I_color;
+      mapOfImages["Camera2"] = &I_depth_color;
+      vpDisplay::display(I_color);
+      vpDisplay::displayText(I_color, 20, 20, "Left click: start service. Righ:quit", vpColor::red);
+      vpDisplay::flush(I_color);
+      
+      if (vpDisplay::getClick(I_color, button, false)) {
+        if(button == vpMouseButton::button1){
+          sensor_msgs::Image sensor_image = visp_bridge::toSensorMsgsImage(I_color);
+          sensor_msgs::CameraInfo sensor_camInfo = visp_bridge::toSensorMsgsCameraInfo(cam_color,width,height);
+          // Send image and cam par to service, where Python node responds with cao_file and pose
+          ROS_INFO("Subscribing to service...");
+          ros::service::waitForService("/Pose_cao_initializer",1000);
+          tracker_visp::YolactInitializeCaoPose srv;
+          srv.request.image = sensor_image;
+          srv.request.camInfo = sensor_camInfo;
+          ROS_INFO("Starting call to service..");
+          if (client.call(srv))
+          {
+            ROS_INFO("Response from service..");
+            opt_model=srv.response.caoFilePath.data;
+            if (opt_model!=""){
+              geometry_msgs::Transform initPose=srv.response.initPose;
+              cMo=visp_bridge::toVispHomogeneousMatrix(initPose);	//object pose cMo
+              tracker->loadModel(opt_model, opt_model);
+              mapOfCameraPoses["Camera1"] = cMo;
+              mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
+              tracker->initFromPose(mapOfImages,mapOfCameraPoses);
+            }
+            else {
+              ROS_INFO("Image discarded");
+            }
+          }
+          else{
+            ROS_ERROR("Cannot receive response from server");
+          }
+        }
+        else if (button == vpMouseButton::button3){
+          terminated=true;
+        }
+      }
     }
   }
-
   else {
     if (opt_pose_init){
       // // Initialize from pose file .pos
@@ -522,7 +559,6 @@ void visual_servoing::learning_process()
     
     eeTc1.buildFrom(t1, q_1);
     wTc1 = wTc*eeTc1.inverse();
-
     
     //! [LOOP]
     //! -----------------------------------------------------------------------------------------------
@@ -1039,15 +1075,16 @@ void visual_servoing::detection_process()
 
         // SERVO SEND ANGLE
           vpThetaUVector cTo_tu = cMo.getThetaUVector();
-          std_msgs::UInt16 angle_to_servo;
+          tracker_visp::angle_velocity angleVel_to_servo;
+          angleVel_to_servo.velocity = 0.01; //degrees/ms, velocity slow
           // std::cout << "Theta: \n" << angle << std::endl;
           if (cTo_tu[1]<0){	//radians, "right face seen from camera"
-            angle_to_servo.data = 130;	//degrees, final angle
-            servoPub.publish(angle_to_servo);
+            angleVel_to_servo.angle = 130;	//degrees, final angle
+            servoPub.publish(angleVel_to_servo);
           }
           else {	//radians, "left face seen from camera"
-            angle_to_servo.data = 50;	//degrees, final angle
-            servoPub.publish(angle_to_servo);
+            angleVel_to_servo.angle = 50;	//degrees, final angle
+            servoPub.publish(angleVel_to_servo);
           } 
         }
         rotated = true;
@@ -1218,9 +1255,10 @@ void visual_servoing::detection_process()
 
     //! -----------------------------------------------------------------------------------------------
     //! [END OF LOOP]
-    std_msgs::UInt16 angle_to_servo;
-    angle_to_servo.data = 90;	//degrees, final angle
-    servoPub.publish(angle_to_servo);
+    tracker_visp::angle_velocity angleVel_to_servo;
+    angleVel_to_servo.angle = 90;	//degrees, setup angle
+    angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
+    servoPub.publish(angleVel_to_servo);
 
     // Terminate learning phase, save all on exit
     if (opt_learn) {
@@ -1234,9 +1272,10 @@ void visual_servoing::detection_process()
     }
 
     if (!times_vec.empty()) {
-      std_msgs::UInt16 angle_to_servo;
-      angle_to_servo.data = 90;	//degrees, final angle
-      servoPub.publish(angle_to_servo);
+      tracker_visp::angle_velocity angleVel_to_servo;
+      angleVel_to_servo.angle = 90;	//degrees, setup angle
+      angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
+      servoPub.publish(angleVel_to_servo);
     std::cout << "\nProcessing time, Mean: " << vpMath::getMean(times_vec) << " ms ; Median: " << vpMath::getMedian(times_vec)
               << " ; Std: " << vpMath::getStdev(times_vec) << " ms" << std::endl;
     }
@@ -1266,7 +1305,7 @@ int main(int argc, char** argv)
   spinner.start();
   ros::Rate loop_rate(20); 
 
-  //visual_servoing learning(nh);
+  visual_servoing learning(nh);
 
   ros::spinOnce();
   loop_rate.sleep();

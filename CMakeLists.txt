@@ -39,16 +39,12 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   ReferenceBlock.msg
+  angle_velocity.msg
 )
 
 add_service_files(
   FILES
   YolactInitializeCaoPose.srv
-)
-
-add_message_files(
-  FILES
-  angle_velocity.msg
 )
 
 generate_messages(
@@ -105,21 +101,21 @@ catkin_package(
 # )
 
 # old tracker
-add_executable(tracker_0
-  src/tracker.cpp
-)
+# add_executable(tracker_0
+#   src/tracker.cpp
+# )
 
-target_link_libraries(tracker_0
-  ${catkin_LIBRARIES}
-  ${VISP_LIBRARIES}
-  ${realsense2_LIBRARY}
-  ${PCL_LIBRARIES}
-)
+# target_link_libraries(tracker_0
+#   ${catkin_LIBRARIES}
+#   ${VISP_LIBRARIES}
+#   ${realsense2_LIBRARY}
+#   ${PCL_LIBRARIES}
+# )
 
-add_dependencies(tracker_0
-  ${catkin_EXPORTED_TARGETS}
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-)
+# add_dependencies(tracker_0
+#   ${catkin_EXPORTED_TARGETS}
+#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
+# )
 
 add_executable(tracker_sim
   src/tracker_sim.cpp
@@ -153,72 +149,72 @@ add_dependencies(detection
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
 )
 
-add_executable(tracker_params
-  src/tracker_params.cpp
-)
+# add_executable(tracker_params
+#   src/tracker_params.cpp
+# )
 
-target_link_libraries(tracker_params
-  ${catkin_LIBRARIES}
-  ${VISP_LIBRARIES}
-  ${realsense2_LIBRARY}
-  ${PCL_LIBRARIES}
-)
+# target_link_libraries(tracker_params
+#   ${catkin_LIBRARIES}
+#   ${VISP_LIBRARIES}
+#   ${realsense2_LIBRARY}
+#   ${PCL_LIBRARIES}
+# )
 
-add_dependencies(tracker_params
-  ${catkin_EXPORTED_TARGETS}
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-)
+# add_dependencies(tracker_params
+#   ${catkin_EXPORTED_TARGETS}
+#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
+# )
 
 # Client
-add_executable(client
-  src/ros_client_pic.cpp
-)
+# add_executable(client
+#   src/ros_client_pic.cpp
+# )
 
-target_link_libraries(client
-  ${catkin_LIBRARIES}
-  ${VISP_LIBRARIES}
-  ${realsense2_LIBRARY}
-  ${PCL_LIBRARIES}
-)
+# target_link_libraries(client
+#   ${catkin_LIBRARIES}
+#   ${VISP_LIBRARIES}
+#   ${realsense2_LIBRARY}
+#   ${PCL_LIBRARIES}
+# )
 
-add_dependencies(client
-  ${catkin_EXPORTED_TARGETS}
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-)
+# add_dependencies(client
+#   ${catkin_EXPORTED_TARGETS}
+#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
+# )
 
 # new tracker
-add_executable(tracker_client
-  src/tracker_v3.cpp
-)
+# add_executable(tracker_client
+#   src/tracker_v3.cpp
+# )
 
-target_link_libraries(tracker_client
-  ${catkin_LIBRARIES}
-  ${VISP_LIBRARIES}
-  ${realsense2_LIBRARY}
-  ${PCL_LIBRARIES}
-)
+# target_link_libraries(tracker_client
+#   ${catkin_LIBRARIES}
+#   ${VISP_LIBRARIES}
+#   ${realsense2_LIBRARY}
+#   ${PCL_LIBRARIES}
+# )
 
-add_dependencies(tracker_client
-  ${catkin_EXPORTED_TARGETS}
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-)
+# add_dependencies(tracker_client
+#   ${catkin_EXPORTED_TARGETS}
+#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
+# )
 
 #Rotating_base
-add_executable(rotating_base
-  src/clientPic_toServo.cpp
-)
+# add_executable(rotating_base
+#   src/clientPic_toServo.cpp
+# )
 
-target_link_libraries(rotating_base
-  ${catkin_LIBRARIES}
-  ${VISP_LIBRARIES}
-  ${realsense2_LIBRARY}
-  ${PCL_LIBRARIES}
-)
+# target_link_libraries(rotating_base
+#   ${catkin_LIBRARIES}
+#   ${VISP_LIBRARIES}
+#   ${realsense2_LIBRARY}
+#   ${PCL_LIBRARIES}
+# )
 
-add_dependencies(rotating_base
-  ${catkin_EXPORTED_TARGETS}
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-)
+# add_dependencies(rotating_base
+#   ${catkin_EXPORTED_TARGETS}
+#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
+# )
 
 #tracker+pbvs
 add_executable(visualServo

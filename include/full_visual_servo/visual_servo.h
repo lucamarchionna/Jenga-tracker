@@ -32,6 +32,7 @@
 #include <boost/bind.hpp>
 
 #include "tracker_visp/YolactInitializeCaoPose.h"
+#include <tracker_visp/angle_velocity.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 #include <tf2_ros/buffer.h>
@@ -70,7 +71,7 @@ class visual_servoing
         void init_parameters();
         void learning_process();
         void detection_process();
-        void learningCallback(const bool msg);
+        void learningCallback(const std_msgs::Bool::ConstPtr& msg);
 
         vpHomogeneousMatrix homogeneousTransformation(string link1, string link2);
         geometry_msgs::TransformStamped toMoveit(vpHomogeneousMatrix data, string header, string child_frame);
