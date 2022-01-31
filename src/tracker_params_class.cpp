@@ -8,8 +8,10 @@ tracking::tracking(ros::NodeHandle& nh) : node_handle(nh)
 
   client = node_handle.serviceClient<tracker_visp::YolactInitializeCaoPose>("/Pose_cao_initializer");
   trackerEstimation = node_handle.advertise<geometry_msgs::Pose>("/pose_estimation", 1);
-  servoPub = node_handle.advertise<std_msgs::UInt16>("/servo", 1);
+  servoPub = node_handle.advertise<tracker_visp::angle_velocity>("/servo", 1);
   subLearning = node_handle.subscribe("/tracker_params/learning_phase", 1, &tracking::learningCallback, this);
+
+  ros::Duration(1.0).sleep();
 
   init_parameters();
   learning_process();
@@ -77,9 +79,10 @@ void tracking::learningCallback(const std_msgs::Bool::ConstPtr& msg)
 
 void tracking::init_parameters()
 {
-  std_msgs::UInt16 angle_to_servo;
-  angle_to_servo.data = 90;	//degrees, final angle
-  servoPub.publish(angle_to_servo);
+  tracker_visp::angle_velocity angleVel_to_servo;
+  angleVel_to_servo.angle = 90;	//degrees, setup angle
+  angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
+  servoPub.publish(angleVel_to_servo);
   //Settings  
   tracker_path = ros::package::getPath("tracker_visp");
   opt_config = tracker_path + "/trackers/jenga_tracker_params.xml";
@@ -352,7 +355,6 @@ void tracking::learning_process()
     
     eeTc1.buildFrom(t1, q_1);
     wTc1 = wTc*eeTc1.inverse();
-
     
     //! [LOOP]
     //! -----------------------------------------------------------------------------------------------
@@ -866,15 +868,16 @@ void tracking::detection_process()
 
         // SERVO SEND ANGLE
           vpThetaUVector cTo_tu = cMo.getThetaUVector();
-          std_msgs::UInt16 angle_to_servo;
+          tracker_visp::angle_velocity angleVel_to_servo;
+          angleVel_to_servo.velocity = 0.01; //degrees/ms, velocity slow
           // std::cout << "Theta: \n" << angle << std::endl;
           if (cTo_tu[1]<0){	//radians, "right face seen from camera"
-            angle_to_servo.data = 130;	//degrees, final angle
-            servoPub.publish(angle_to_servo);
+            angleVel_to_servo.angle = 130;	//degrees, final angle
+            servoPub.publish(angleVel_to_servo);
           }
           else {	//radians, "left face seen from camera"
-            angle_to_servo.data = 50;	//degrees, final angle
-            servoPub.publish(angle_to_servo);
+            angleVel_to_servo.angle = 50;	//degrees, final angle
+            servoPub.publish(angleVel_to_servo);
           } 
         }
         rotated = true;
@@ -1043,9 +1046,10 @@ void tracking::detection_process()
 
     //! -----------------------------------------------------------------------------------------------
     //! [END OF LOOP]
-    std_msgs::UInt16 angle_to_servo;
-    angle_to_servo.data = 90;	//degrees, final angle
-    servoPub.publish(angle_to_servo);
+    tracker_visp::angle_velocity angleVel_to_servo;
+    angleVel_to_servo.angle = 90;	//degrees, setup angle
+    angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
+    servoPub.publish(angleVel_to_servo);
 
     // Terminate learning phase, save all on exit
     if (opt_learn) {
@@ -1059,9 +1063,10 @@ void tracking::detection_process()
     }
 
     if (!times_vec.empty()) {
-      std_msgs::UInt16 angle_to_servo;
-      angle_to_servo.data = 90;	//degrees, final angle
-      servoPub.publish(angle_to_servo);
+      tracker_visp::angle_velocity angleVel_to_servo;
+      angleVel_to_servo.angle = 90;	//degrees, setup angle
+      angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
+      servoPub.publish(angleVel_to_servo);
     std::cout << "\nProcessing time, Mean: " << vpMath::getMean(times_vec) << " ms ; Median: " << vpMath::getMedian(times_vec)
               << " ; Std: " << vpMath::getStdev(times_vec) << " ms" << std::endl;
     }

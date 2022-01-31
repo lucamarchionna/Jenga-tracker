@@ -52,6 +52,7 @@
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
+  <depend>message_generation</depend>
   
   <build_depend>pcl_ros</build_depend>
   <build_depend>pcl_conversions</build_depend>
@@ -61,7 +62,6 @@
   <build_depend>visp_ros</build_depend>
   <build_depend>visp_bridge</build_depend>
   <build_depend>visp</build_depend>
-  <build_depend>message_generation</build_depend>
 
   
   
