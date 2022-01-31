@@ -103,10 +103,12 @@ void tracking::init_parameters()
   catch (const vpException &e) {
     std::cout << "Catch an exception: " << e.what() << std::endl;
     std::cout << "Check if the Realsense camera is connected..." << std::endl;
+    return;
   }
   catch (const rs2::error &e) {
     std::cout << "Catch an exception: " << e.what() << std::endl;
     std::cout << "Check if the Realsense camera is connected..." << std::endl;
+    return;
   }
 
   cam_color = realsense.getCameraParameters(RS2_STREAM_COLOR, vpCameraParameters::perspectiveProjWithoutDistortion);
@@ -133,7 +135,7 @@ void tracking::init_parameters()
   
 
   // [Acquire stream and initialize displays]
-  while (true) {
+  while (node_handle.ok()) {
     realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, NULL, NULL);
 
     vpDisplay::display(I_color);
@@ -228,31 +230,64 @@ void tracking::learning_process()
   } 
 
   else if (opt_yolact_init) {
-    sensor_msgs::Image sensor_image = visp_bridge::toSensorMsgsImage(I_color);
-	  sensor_msgs::CameraInfo sensor_camInfo = visp_bridge::toSensorMsgsCameraInfo(cam_color,width,height);
-    // Send image and cam par to service, where Python node responds with cao_file and pose
-    ROS_INFO("Subscribing to service...");
-    ros::service::waitForService("/Pose_cao_initializer");
-    srv.request.image = sensor_image;
-    srv.request.camInfo = sensor_camInfo;
-    ROS_INFO("Starting call to service..");
-    if (client.call(srv))
-    {
-      ROS_INFO("Response from service..");
-      opt_model = srv.response.caoFilePath.data;
-      geometry_msgs::Transform initPose = srv.response.initPose;
-      cMo = visp_bridge::toVispHomogeneousMatrix(initPose);
-      tracker->loadModel(opt_model, opt_model);
-      mapOfCameraPoses["Camera1"] = cMo;
-      mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
-      tracker->initFromPose(mapOfImages,mapOfCameraPoses);
-    }
+  	// [Acquire stream and initialize displays]
+    bool terminated = false;
+    vpMouseButton::vpMouseButtonType button;
+    opt_model="";
+      while (!terminated && (opt_model=="") && node_handle.ok()) {
+      try{
+        realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, NULL, NULL);
+      }
+      catch (const rs2::error &e){
+          std::cout << "Catch an exception: " << e.what() << std::endl;
+          return;
+      }
 
-    else{
-      ROS_ERROR("Cannot receive response from server");
+      vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
+      vpImageConvert::convert(I_depth_gray,I_depth_color);
+      mapOfImages["Camera1"] = &I_color;
+      mapOfImages["Camera2"] = &I_depth_color;
+      vpDisplay::display(I_color);
+      vpDisplay::displayText(I_color, 20, 20, "Left click: start service. Righ:quit", vpColor::red);
+      vpDisplay::flush(I_color);
+      
+      if (vpDisplay::getClick(I_color, button, false)) {
+        if(button == vpMouseButton::button1){
+          sensor_msgs::Image sensor_image = visp_bridge::toSensorMsgsImage(I_color);
+          sensor_msgs::CameraInfo sensor_camInfo = visp_bridge::toSensorMsgsCameraInfo(cam_color,width,height);
+          // Send image and cam par to service, where Python node responds with cao_file and pose
+          ROS_INFO("Subscribing to service...");
+          ros::service::waitForService("/Pose_cao_initializer",1000);
+          tracker_visp::YolactInitializeCaoPose srv;
+          srv.request.image = sensor_image;
+          srv.request.camInfo = sensor_camInfo;
+          ROS_INFO("Starting call to service..");
+          if (client.call(srv))
+          {
+            ROS_INFO("Response from service..");
+            opt_model=srv.response.caoFilePath.data;
+            if (opt_model!=""){
+              geometry_msgs::Transform initPose=srv.response.initPose;
+              cMo=visp_bridge::toVispHomogeneousMatrix(initPose);	//object pose cMo
+              tracker->loadModel(opt_model, opt_model);
+              mapOfCameraPoses["Camera1"] = cMo;
+              mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
+              tracker->initFromPose(mapOfImages,mapOfCameraPoses);
+            }
+            else {
+              ROS_INFO("Image discarded");
+            }
+          }
+          else{
+            ROS_ERROR("Cannot receive response from server");
+          }
+        }
+        else if (button == vpMouseButton::button3){
+          terminated=true;
+        }
+      }
     }
   }
-
   else {
     if (opt_pose_init){
       // // Initialize from pose file .pos

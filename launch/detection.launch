@@ -4,9 +4,6 @@
     <!-- Define relation between camera and end-effector -->
     <node pkg="tf2_ros" type="static_transform_publisher" name="ee2cam"
         args="-0.052 0.032 0.0 0 0 -0.7071068 0.7071068 edo_link_6 camera_color_optical_frame" />       
-    
-    <node name="Yolact_server" pkg="tracker_visp" type="Yolact_server_Pose_initializer.py" output="screen" />   
-
+        
     <node name="tracker" pkg="tracker_visp" type="detection" output="screen" />
-
 </launch>
