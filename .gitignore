@@ -1,8 +1,11 @@
 *.png
 *.jpg
 *.jpeg
-.vscode/
-tracker_visp/yolact_cpu/
-tracker_visp/src/__pycache__/*
-tracker_visp/learning/
-tracker_visp/.vscode/
+yolact_cpu
+src/__pycache__/*
+learning/
+.vscode
+build
+model/
+!model/blocks_cao
+!model/jenga_zEnd

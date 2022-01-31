@@ -1,6 +1,7 @@
 #include <iostream>
 #include <ros/ros.h>
 #include <std_msgs/Bool.h>
+#include <tracker_visp/angle_velocity.h>
 
 #include <visp3/core/vpConfig.h>
 
