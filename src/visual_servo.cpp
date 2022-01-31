@@ -184,7 +184,7 @@ void visual_servoing::init_parameters()
   angle_to_servo.data = 90;	//degrees, final angle
   servoPub.publish(angle_to_servo);
   //Settings  
-  tracker_path = ros::package::getPath("tracker_visp");
+  tracker_path = ros::package::getPath("tracker_vgithisp");
   opt_config = tracker_path + "/trackers/jenga_tracker_params.xml";
   opt_model = tracker_path + "/model/file_cao.cao";
   opt_init = tracker_path + "/model/jenga_single.init";
