@@ -5,8 +5,4 @@ yolact_cpu
 src/__pycache__/*
 learning/
 .vscode
-<<<<<<< HEAD
 build
-=======
-build
->>>>>>> 37d12783b7ccfda124f61abc9b985b8c194560b7
