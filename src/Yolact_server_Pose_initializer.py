@@ -42,7 +42,9 @@ from layers.output_utils import postprocess
 class Yolact_pose_service():
   def __init__(self):
     self.msg_image=None
-    self.img_imshow=np.zeros((480,960,3),dtype=np.uint8)
+    self.width=480
+    self.height=480
+    self.img_imshow=np.zeros((self.width,self.height*2,3),dtype=np.uint8)
     #Init stuff to enable loop
     self.newImage=False
     self.keyFromWindow=0
@@ -209,6 +211,7 @@ class Yolact_pose_service():
     #SAVE STUFF
 
     selected_group=False
+    chosen_img=np.zeros((self.width,self.height*2,3),dtype=np.uint8)
     rospy.loginfo("\nChoose one group pressing 'c', pass pressing 'q', exit pressing 'esc'\n")
     while(not selected_group):
       for random_block_group in blocks_groups_list:
@@ -235,14 +238,17 @@ class Yolact_pose_service():
             cao_name_msg=String()
             cao_name_msg.data=""
             init_pose_msg=Transform()
+            self.img_imshow=np.zeros((self.width,self.height*2,3),dtype=np.uint8)
             rospy.loginfo("SERVICE HALTED BY USER")
             return {'caoFilePath':cao_name_msg,'initPose':init_pose_msg}
 
           if (k==ord('c') and not selected_group):
             chosen_blocks_group=random_block_group
             selected_group=True
+            chosen_img=self.img_imshow
             cv2.imwrite(img_name[:-3]+'-'+str(time.time())+img_name[-4:],self.img_imshow)
-      
+
+    self.img_imshow=chosen_img.copy()      
     
     # %%
     # # Single block size and reference pose setup
