@@ -38,6 +38,11 @@ add_service_files(
   YolactInitializeCaoPose.srv
 )
 
+add_message_files(
+  FILES
+  angle_velocity.msg
+)
+
 generate_messages(
   DEPENDENCIES
   geometry_msgs
@@ -56,7 +61,7 @@ include_directories(
   ${PCL_INCLUDE_DIRS}
 )
 catkin_package(
-  CATKIN_DEPENDS rospy roscpp geometry_msgs std_msgs pcl_ros pcl_msgs pcl_conversions
+  CATKIN_DEPENDS message_generation rospy roscpp geometry_msgs std_msgs pcl_ros pcl_msgs pcl_conversions
   DEPENDS PCL VISP visp_bridge Boost
 )
 # tracker

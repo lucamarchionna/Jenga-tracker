@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-
 import numpy as np
 import cv2
 
@@ -18,7 +17,10 @@ class Block():
         self.masked=cv2.bitwise_and(self.img,self.img,mask=self.maskcv2)
     
     def find_contour(self,retr_list=cv2.RETR_LIST,chain_approx=cv2.CHAIN_APPROX_NONE):
-        self.contours_all, _ = cv2.findContours(self.maskcv2,retr_list,chain_approx)
+        try:
+            self.contours_all, _ = cv2.findContours(self.maskcv2,retr_list,chain_approx)
+        except ValueError:
+            _, self.contours_all, _ = cv2.findContours(self.maskcv2,retr_list,chain_approx)
         self.contour_max=max(self.contours_all,key=cv2.contourArea)
         self.area=cv2.contourArea(self.contour_max)
         moments = cv2.moments(self.contour_max)
@@ -172,6 +174,11 @@ class Block():
             cv2.circle(temp,self.centroid,5,[255,255,0],thickness=-1)
             cv2.line(temp,self.centroid,self.test_up,[255,255,255],thickness=2)
             cv2.line(temp,self.centroid,self.test_down,[255,0,0],thickness=2)
+            cv2.line(temp,self.centroid,self.test_up1,[255,255,255],thickness=1)
+            cv2.line(temp,self.centroid,self.test_up1left0,[255,255,0],thickness=1)
+            cv2.line(temp,self.centroid,self.test_up1right0,[255,0,255],thickness=1)
+            cv2.line(temp,self.centroid,self.test_up1left1,[180,180,180],thickness=1)
+            cv2.line(temp,self.centroid,self.test_up1right1,[180,0,180],thickness=1)
             cv2.line(temp,self.centroid,self.test_right0,[0,0,255],thickness=2)
             cv2.line(temp,self.centroid,self.test_left0,[0,255,0],thickness=2)
         return temp
@@ -192,18 +199,39 @@ class Block():
         self.test_right1=(0,0)
         self.test_left0=(0,0)
         self.test_left1=(0,0)
+        self.test_upleft=(0,0)
+        self.test_downleft=(0,0)
+        self.test_upright1=(0,0)
+        self.test_downright1=(0,0)
         if self.block_type=='front_face':
             if self.versor_V[1]>0:  #versor going down
                 self.test_up=(int(self.centroid[0]-self.avgLength_V*self.versor_V[0]),int(self.centroid[1]-self.avgLength_V*self.versor_V[1]))
                 self.test_down=(int(self.centroid[0]+self.avgLength_V*self.versor_V[0]),int(self.centroid[1]+self.avgLength_V*self.versor_V[1]))
+                self.test_up1=(int(self.centroid[0]-2*self.avgLength_V*self.versor_V[0]),int(self.centroid[1]-2*self.avgLength_V*self.versor_V[1]))
             else: 
                 self.test_up=(int(self.centroid[0]+self.avgLength_V*self.versor_V[0]),int(self.centroid[1]+self.avgLength_V*self.versor_V[1]))
                 self.test_down=(int(self.centroid[0]-self.avgLength_V*self.versor_V[0]),int(self.centroid[1]-self.avgLength_V*self.versor_V[1]))
+                self.test_up1=(int(self.centroid[0]+2*self.avgLength_V*self.versor_V[0]),int(self.centroid[1]+2*self.avgLength_V*self.versor_V[1]))
             self.test_right0=(int(self.centroid[0]+self.avgLength_H*self.versor_H[0]),int(self.centroid[1]+self.avgLength_H*self.versor_H[1]))
             self.test_right1=(int(self.centroid[0]+2*self.avgLength_H*self.versor_H[0]),int(self.centroid[1]+2*self.avgLength_H*self.versor_H[1]))
             self.test_left0=(int(self.centroid[0]-self.avgLength_H*self.versor_H[0]),int(self.centroid[1]-self.avgLength_H*self.versor_H[1]))
             self.test_left1=(int(self.centroid[0]-2*self.avgLength_H*self.versor_H[0]),int(self.centroid[1]-2*self.avgLength_H*self.versor_H[1]))
-        return self.test_up,self.test_down,self.test_right0,self.test_right1,self.test_left0,self.test_left1
+            self.test_upleft0=(int(self.test_up[0]-self.avgLength_H*self.versor_H[0]),int(self.test_up[1]-self.avgLength_H*self.versor_H[1]))
+            self.test_downleft0=(int(self.test_down[0]-self.avgLength_H*self.versor_H[0]),int(self.test_down[1]-self.avgLength_H*self.versor_H[1]))
+            self.test_upright1=(int(self.test_up[0]+2*self.avgLength_H*self.versor_H[0]),int(self.test_up[1]+2*self.avgLength_H*self.versor_H[1]))
+            self.test_downright1=(int(self.test_down[0]+2*self.avgLength_H*self.versor_H[0]),int(self.test_down[1]+2*self.avgLength_H*self.versor_H[1]))
+            self.test_upright0=(int(self.test_up[0]+self.avgLength_H*self.versor_H[0]),int(self.test_up[1]+self.avgLength_H*self.versor_H[1]))
+            self.test_downright0=(int(self.test_down[0]+self.avgLength_H*self.versor_H[0]),int(self.test_down[1]+self.avgLength_H*self.versor_H[1]))
+            self.test_upleft1=(int(self.test_up[0]-2*self.avgLength_H*self.versor_H[0]),int(self.test_up[1]-2*self.avgLength_H*self.versor_H[1]))
+            self.test_downleft1=(int(self.test_down[0]-2*self.avgLength_H*self.versor_H[0]),int(self.test_down[1]-2*self.avgLength_H*self.versor_H[1]))
+            self.test_up1left0=(int(self.test_up1[0]-self.avgLength_H*self.versor_H[0]),int(self.test_up1[1]-self.avgLength_H*self.versor_H[1]))
+            self.test_up1right0=(int(self.test_up1[0]+self.avgLength_H*self.versor_H[0]),int(self.test_up1[1]+self.avgLength_H*self.versor_H[1]))
+            self.test_up1left1=(int(self.test_up1[0]-2*self.avgLength_H*self.versor_H[0]),int(self.test_up1[1]-2*self.avgLength_H*self.versor_H[1]))
+            self.test_up1right1=(int(self.test_up1[0]+2*self.avgLength_H*self.versor_H[0]),int(self.test_up1[1]+2*self.avgLength_H*self.versor_H[1]))
+        return self.test_up,self.test_down,self.test_right0,self.test_right1,self.test_left0,self.test_left1,\
+            self.test_upleft0,self.test_downleft0,self.test_upright1,self.test_downright1,self.test_upright0,\
+            self.test_downright0,self.test_upleft1,self.test_downleft1,\
+            self.test_up1,self.test_up1left0,self.test_up1right0,self.test_up1left1,self.test_up1right1
 
 
 if __name__=='__main__':

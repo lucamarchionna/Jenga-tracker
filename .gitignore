@@ -5,4 +5,11 @@ yolact_cpu
 src/__pycache__/*
 learning/
 .vscode
+<<<<<<< HEAD
 build
+=======
+build
+model/
+!model/blocks_cao
+!model/jenga_zEnd
+>>>>>>> 95e8f953f8a429bfaa04bf9ffe2d1b67aaa3e6fd
