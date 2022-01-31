@@ -26,7 +26,7 @@
 
 bool opt_learn = true;
 bool opt_auto_init = false;
-
+bool git = true;
 bool learn_position = false;
 
 // Convert vpHomogeneus to TFMessage
