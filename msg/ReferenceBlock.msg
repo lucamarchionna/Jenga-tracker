@@ -1,3 +1,2 @@
-string position
-string orientation
-geometry_msgs/Pose pose
+tracker_visp/location location
+geometry_msgs/PoseStamped pose
