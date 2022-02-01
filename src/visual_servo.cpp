@@ -366,7 +366,7 @@ void visual_servoing::learning_process()
 {
   
   opt_learn = true;
-  opt_auto_init = false; 
+  //opt_auto_init = false; // already in init_parameters()
   opt_pose_init = true;
   learn_position = false;
 
@@ -380,11 +380,6 @@ void visual_servoing::learning_process()
   std::map<std::string, unsigned int> mapOfWidths, mapOfHeights;
   std::map<std::string, vpHomogeneousMatrix> mapOfCameraPoses;
   std::vector<vpColVector> pointcloud;
-
-  // Set keypoints type from code if not from file
-  std::string detectorName = "FAST";
-  std::string extractorName = "ORB";
-  std::string matcherName = "BruteForce-Hamming";
   
   mapOfCameraTransformations["Camera2"] = depth_M_color;
   mapOfImages["Camera1"] = &I_color;
@@ -400,109 +395,80 @@ void visual_servoing::learning_process()
   tracker = new vpMbGenericTracker(trackerTypes);
   
   tracker->loadConfigFile(opt_config, opt_config);
-  //tracker->loadModel(opt_model, opt_model);
+  
   tracker->setCameraTransformationMatrix(mapOfCameraTransformations);
   tracker->setCameraParameters(cam_color, cam_depth);
 
-  if (opt_learn || opt_auto_init) {
-    // Load keypoints config
-    if (vpIoTools::checkFilename(opt_keypoint_config)){
-      keypoint.loadConfigFile(opt_keypoint_config);
-    }
-    else if (opt_learn || opt_auto_init) {
-      keypoint.setDetector(detectorName);
-      keypoint.setExtractor(extractorName);
-      keypoint.setMatcher(matcherName);
-    }
+  if (vpIoTools::checkFilename(opt_keypoint_config)){
+    keypoint.loadConfigFile(opt_keypoint_config);
+  }
+  else {
+    ROS_ERROR("Could not find keypoint config file");
+    return;
   }
 
   // Directory to store learning data
-  if (opt_learn && !opt_auto_init)
-    vpIoTools::makeDirectory(vpIoTools::getParent(opt_learning_data));
+  if (vpIoTools::checkDirectory(vpIoTools::getParent(opt_learning_data)))
+    vpIoTools::remove(vpIoTools::getParent(opt_learning_data));
+  vpIoTools::makeDirectory(vpIoTools::getParent(opt_learning_data));
 
-  // Load auto learn data, or initialize with clicks
-
-   
-  if (opt_auto_init) {
-    // Preparation for automatic initialization
-    if (!vpIoTools::checkFilename(opt_learning_data)) {
-      std::cout << "Cannot enable auto detection. Learning file \"" << opt_learning_data << "\" doesn't exist" << std::endl;
-      //return EXIT_FAILURE;
+  // else if (opt_yolact_init) {
+  // [INITIALIZE WITH YOLACT]
+  // [Acquire stream and initialize displays]
+  bool terminated = false;
+  vpMouseButton::vpMouseButtonType button;
+  opt_model="";
+  while (!terminated && (opt_model=="") && node_handle.ok()) {
+    try{
+      realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, NULL, NULL);
     }
-    keypoint.loadLearningData(opt_learning_data, true);
-    vpImageConvert::convert(I_color, I_gray);
-    keypoint.createImageMatching(I_gray, IMatching);
-    d3.setDownScalingFactor(vpDisplay::SCALE_AUTO);
-    d3.init(IMatching, _posx+I_gray.getWidth()*2+10, _posy, "Detection-from-learned");
-  } 
+    catch (const rs2::error &e){
+        std::cout << "Catch an exception: " << e.what() << std::endl;
+        return;
+    }
 
-  else if (opt_yolact_init) {
-  	// [Acquire stream and initialize displays]
-    bool terminated = false;
-    vpMouseButton::vpMouseButtonType button;
-    opt_model="";
-      while (!terminated && (opt_model=="") && node_handle.ok()) {
-      try{
-        realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, NULL, NULL);
-      }
-      catch (const rs2::error &e){
-          std::cout << "Catch an exception: " << e.what() << std::endl;
-          return;
-      }
-
-      vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
-      vpImageConvert::convert(I_depth_gray,I_depth_color);
-      mapOfImages["Camera1"] = &I_color;
-      mapOfImages["Camera2"] = &I_depth_color;
-      vpDisplay::display(I_color);
-      vpDisplay::displayText(I_color, 20, 20, "Left click: start service. Righ:quit", vpColor::red);
-      vpDisplay::flush(I_color);
-      
-      if (vpDisplay::getClick(I_color, button, false)) {
-        if(button == vpMouseButton::button1){
-          sensor_msgs::Image sensor_image = visp_bridge::toSensorMsgsImage(I_color);
-          sensor_msgs::CameraInfo sensor_camInfo = visp_bridge::toSensorMsgsCameraInfo(cam_color,width,height);
-          // Send image and cam par to service, where Python node responds with cao_file and pose
-          ROS_INFO("Subscribing to service...");
-          ros::service::waitForService("/Pose_cao_initializer",1000);
-          tracker_visp::YolactInitializeCaoPose srv;
-          srv.request.image = sensor_image;
-          srv.request.camInfo = sensor_camInfo;
-          ROS_INFO("Starting call to service..");
-          if (client.call(srv))
-          {
-            ROS_INFO("Response from service..");
-            opt_model=srv.response.caoFilePath.data;
-            if (opt_model!=""){
-              geometry_msgs::Transform initPose=srv.response.initPose;
-              cMo=visp_bridge::toVispHomogeneousMatrix(initPose);	//object pose cMo
-              tracker->loadModel(opt_model, opt_model);
-              mapOfCameraPoses["Camera1"] = cMo;
-              mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
-              tracker->initFromPose(mapOfImages,mapOfCameraPoses);
-            }
-            else {
-              ROS_INFO("Image discarded");
-            }
+    vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
+    vpImageConvert::convert(I_depth_gray,I_depth_color);
+    mapOfImages["Camera1"] = &I_color;
+    mapOfImages["Camera2"] = &I_depth_color;
+    vpDisplay::display(I_color);
+    vpDisplay::displayText(I_color, 20, 20, "Left click: start service. Righ:quit", vpColor::red);
+    vpDisplay::flush(I_color);
+    
+    if (vpDisplay::getClick(I_color, button, false)) {
+      if(button == vpMouseButton::button1){
+        sensor_msgs::Image sensor_image = visp_bridge::toSensorMsgsImage(I_color);
+        sensor_msgs::CameraInfo sensor_camInfo = visp_bridge::toSensorMsgsCameraInfo(cam_color,width,height);
+        // Send image and cam par to service, where Python node responds with cao_file and pose
+        ROS_INFO("Subscribing to service...");
+        ros::service::waitForService("/Pose_cao_initializer",1000);
+        tracker_visp::YolactInitializeCaoPose srv;
+        srv.request.image = sensor_image;
+        srv.request.camInfo = sensor_camInfo;
+        ROS_INFO("Starting call to service..");
+        if (client.call(srv))
+        {
+          ROS_INFO("Response from service..");
+          opt_model=srv.response.caoFilePath.data;
+          if (opt_model!=""){
+            geometry_msgs::Transform initPose=srv.response.initPose;
+            cMo=visp_bridge::toVispHomogeneousMatrix(initPose);	//object pose cMo
+            tracker->loadModel(opt_model, opt_model);
+            mapOfCameraPoses["Camera1"] = cMo;
+            mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
+            tracker->initFromPose(mapOfImages,mapOfCameraPoses);
           }
-          else{
-            ROS_ERROR("Cannot receive response from server");
+          else {
+            ROS_INFO("Image discarded");
           }
         }
-        else if (button == vpMouseButton::button3){
-          terminated=true;
+        else{
+          ROS_ERROR("Cannot receive response from server");
         }
       }
-    }
-  }
-  else {
-    if (opt_pose_init){
-      // // Initialize from pose file .pos
-      tracker->initFromPose(mapOfImages,mapOfInitPoses);
-    }
-    else {
-      // // Initialize with clicks from .init
-      tracker->initClick(mapOfImages, mapOfInitFiles, true);
+      else if (button == vpMouseButton::button3){
+        terminated=true;
+      }
     }
   }
 
@@ -534,13 +500,6 @@ void visual_servoing::learning_process()
   std::vector<double> times_vec;
   std::vector<double> train_t_vec;
   std::vector<double> detect_t_vec;
-
-  //Initialize the writer.
-  if (opt_learn && opt_display_features){
-    vpIoTools::makeDirectory(vpIoTools::getParent(opt_learning_data).append("_cross"));
-    writer.setFileName(vpIoTools::getParent(opt_learning_data).append("_cross/image%04d.jpeg"));
-    writer.open(I_color);
-  }
   
   try {
     
@@ -717,16 +676,10 @@ void visual_servoing::learning_process()
       vpDisplay::flush(I_depth_color);
 
       if (vpDisplay::getClick(I_color, button, false)) {
-        if (button == vpMouseButton::button3) {
+        if (button == vpMouseButton::button3)
           quit = true;
-        } else if (button == vpMouseButton::button1 && opt_learn) {
+        else if (button == vpMouseButton::button1)
           learn_position = true;
-        } else if (button == vpMouseButton::button1 && opt_auto_init && !opt_learn) {
-          run_auto_init = true;
-        }
-      }
-      if (vpDisplay::getClick(I_depth_color, false)) {
-        quit = true;
       }
 
       // Loop time without training
@@ -756,21 +709,6 @@ void visual_servoing::learning_process()
 
         // Build the reference keypoints
         keypoint.buildReference(I_color, trainKeyPoints, points3f, true, learn_id++);
-
-        if(opt_display_features){
-          writer.close();
-          // Display learned data
-          for (std::vector<cv::KeyPoint>::const_iterator it = trainKeyPoints.begin(); it != trainKeyPoints.end(); ++it) {
-            vpDisplay::displayCross(I_color, (int)it->pt.y, (int)it->pt.x, 10, vpColor::yellow, 3);
-            vpImageDraw::drawCross(I_color,vpImagePoint((int)it->pt.y, (int)it->pt.x), 10, vpColor::yellow, 2);
-            vpFont font(20);
-            std::stringstream ss;
-            ss << "Number: " << trainKeyPoints.size();
-            font.drawText(I_color, ss.str(), vpImagePoint(35,20), vpColor::red);
-          }
-          writer.saveFrame(I_color);
-          
-        }
 
         // Display saved learned image
         if (((learn_cpt-1)%4)==0){
@@ -881,12 +819,6 @@ void visual_servoing::detection_process()
   tracker->setCameraParameters(cam_color, cam_depth);
   */
 
-  // Set keypoints type from code if not from file
-  std::string detectorName = "FAST";
-  std::string extractorName = "ORB";
-  std::string matcherName = "BruteForce-Hamming";
-  
-
   // Load auto learn data, or initialize with clicks
   if (opt_auto_init) {
     // Preparation for automatic initialization
@@ -899,42 +831,6 @@ void visual_servoing::detection_process()
     d3.setDownScalingFactor(vpDisplay::SCALE_AUTO);
     d3.init(IMatching, _posx+I_gray.getWidth()*2+10, _posy, "Detection-from-learned");
   } 
-
-  else if (opt_yolact_init) {
-    sensor_msgs::Image sensor_image = visp_bridge::toSensorMsgsImage(I_color);
-	  sensor_msgs::CameraInfo sensor_camInfo = visp_bridge::toSensorMsgsCameraInfo(cam_color,width,height);
-    // Send image and cam par to service, where Python node responds with cao_file and pose
-    ROS_INFO("Subscribing to service...");
-    ros::service::waitForService("/Pose_cao_initializer");
-    srv.request.image = sensor_image;
-    srv.request.camInfo = sensor_camInfo;
-    ROS_INFO("Starting call to service..");
-    if (client.call(srv))
-    {
-      ROS_INFO("Response from service..");
-      opt_model=srv.response.caoFilePath.data;
-      geometry_msgs::Transform initPose=srv.response.initPose;
-      cMo=visp_bridge::toVispHomogeneousMatrix(initPose);
-      tracker->loadModel(opt_model, opt_model);
-      mapOfCameraPoses["Camera1"] = cMo;
-      mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
-      tracker->initFromPose(mapOfImages,mapOfCameraPoses);
-    }
-    else{
-      ROS_ERROR("Cannot receive response from server");
-    }
-  }
-
-  else {
-    if (opt_pose_init){
-      // // Initialize from pose file .pos
-      tracker->initFromPose(mapOfImages,mapOfInitPoses);
-    }
-    else {
-      // // Initialize with clicks from .init
-      tracker->initClick(mapOfImages, mapOfInitFiles, true);
-    }
-  }
 
   // Display and error
   tracker->setDisplayFeatures(opt_display_features);
@@ -958,20 +854,8 @@ void visual_servoing::detection_process()
   std::vector<double> times_vec;
   std::vector<double> train_t_vec;
   std::vector<double> detect_t_vec;
-
-  //Initialize the writer.
-  if (opt_learn && opt_display_features){
-    vpIoTools::makeDirectory(vpIoTools::getParent(opt_learning_data).append("_cross"));
-    writer.setFileName(vpIoTools::getParent(opt_learning_data).append("_cross/image%04d.jpeg"));
-    writer.open(I_color);
-  }
   
   try {
-    
-    //To be able to display keypoints matching with test-detection-rs2
-    int learn_id = 1;
-    unsigned int learn_cpt = 0;
-  
     double loop_t = 0;
     
     bool quit = false;
@@ -1043,11 +927,11 @@ void visual_servoing::detection_process()
           continue;
         }
       }
-      else if (tracking_failed) {
-        // Manual init
-        tracking_failed = false;
-        tracker->initClick(mapOfImages, mapOfInitFiles, true);
-      }
+      // else if (tracking_failed) {
+      //   // Manual init
+      //   tracking_failed = false;
+      //   tracker->initClick(mapOfImages, mapOfInitFiles, true);
+      // }
 
       // Run the tracker
       try {
@@ -1174,82 +1058,14 @@ void visual_servoing::detection_process()
       if (vpDisplay::getClick(I_color, button, false)) {
         if (button == vpMouseButton::button3) {
           quit = true;
-        } else if (button == vpMouseButton::button1 && opt_learn) {
-          learn_position = true;
-        } else if (button == vpMouseButton::button1 && opt_auto_init && !opt_learn) {
+        } else if (button == vpMouseButton::button1) {
           run_auto_init = true;
         }
-      }
-      if (vpDisplay::getClick(I_depth_color, false)) {
-        quit = true;
       }
 
       // Loop time without training
       loop_t = vpTime::measureTimeMs() - t;
       times_vec.push_back(loop_t);
-
-
-      if (learn_position) {
-        double train_t = vpTime::measureTimeMs();
-
-        learn_cpt ++;
-        
-        // Detect keypoints on the current image
-        std::vector<cv::KeyPoint> trainKeyPoints;
-        keypoint.detect(I_color, trainKeyPoints);
-
-        // Keep only keypoints on the object
-        std::vector<vpPolygon> polygons;
-        std::vector<std::vector<vpPoint> > roisPt;
-        std::pair<std::vector<vpPolygon>, std::vector<std::vector<vpPoint> > > pair = tracker->getPolygonFaces();
-        polygons = pair.first;
-        roisPt = pair.second;
-
-        // Compute the 3D coordinates
-        std::vector<cv::Point3f> points3f;
-        vpKeyPoint::compute3DForPointsInPolygons(cMo, cam_color, trainKeyPoints, polygons, roisPt, points3f);
-
-        // Build the reference keypoints
-        keypoint.buildReference(I_color, trainKeyPoints, points3f, true, learn_id++);
-
-        if(opt_display_features){
-          writer.close();
-          // Display learned data
-          for (std::vector<cv::KeyPoint>::const_iterator it = trainKeyPoints.begin(); it != trainKeyPoints.end(); ++it) {
-            vpDisplay::displayCross(I_color, (int)it->pt.y, (int)it->pt.x, 10, vpColor::yellow, 3);
-            vpImageDraw::drawCross(I_color,vpImagePoint((int)it->pt.y, (int)it->pt.x), 10, vpColor::yellow, 2);
-            vpFont font(20);
-            std::stringstream ss;
-            ss << "Number: " << trainKeyPoints.size();
-            font.drawText(I_color, ss.str(), vpImagePoint(35,20), vpColor::red);
-          }
-          writer.saveFrame(I_color);
-          
-        }
-
-        // Display saved learned image
-        if (((learn_cpt-1)%4)==0){
-          ILearned.insert(I_color,vpImagePoint(0,0));
-        }
-        else if (((learn_cpt-1)%4)==1){
-          ILearned.insert(I_color,vpImagePoint(0,I_color.getWidth()));
-        }
-        else if (((learn_cpt-1)%4)==2){
-          ILearned.insert(I_color,vpImagePoint(I_color.getHeight(),0)); 
-        }
-        else if (((learn_cpt-1)%4)==3){
-          ILearned.insert(I_color,vpImagePoint(I_color.getHeight(),I_color.getWidth())); 
-        }
-        vpDisplay::display(ILearned);
-        vpDisplay::flush(ILearned);
-
-        learn_position = false;
-        std::cout << "Data learned" << std::endl;
-
-        train_t_vec.push_back(vpTime::measureTimeMs() - train_t);
-      }
-
-
 
     }
 
@@ -1260,17 +1076,6 @@ void visual_servoing::detection_process()
     angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
     servoPub.publish(angleVel_to_servo);
 
-    // Terminate learning phase, save all on exit
-    if (opt_learn) {
-      
-      if (learn_cpt>0){
-        std::cout << "Save learning from " << learn_cpt << " images in file: " << opt_learning_data << std::endl;
-        keypoint.saveLearningData(opt_learning_data, true, true);
-      }
-
-    
-    }
-
     if (!times_vec.empty()) {
       tracker_visp::angle_velocity angleVel_to_servo;
       angleVel_to_servo.angle = 90;	//degrees, setup angle
@@ -1278,10 +1083,6 @@ void visual_servoing::detection_process()
       servoPub.publish(angleVel_to_servo);
     std::cout << "\nProcessing time, Mean: " << vpMath::getMean(times_vec) << " ms ; Median: " << vpMath::getMedian(times_vec)
               << " ; Std: " << vpMath::getStdev(times_vec) << " ms" << std::endl;
-    }
-    if (!train_t_vec.empty()) {
-    std::cout << "\nTrain:\nProcessing time, Mean: " << vpMath::getMean(train_t_vec) << " ms ; Median: " << vpMath::getMedian(train_t_vec)
-              << " ; Std: " << vpMath::getStdev(train_t_vec) << " ms" << std::endl;
     }
     if (!detect_t_vec.empty()) {
     std::cout << "\nDetection:\nProcessing time, Mean: " << vpMath::getMean(detect_t_vec) << " ms ; Median: " << vpMath::getMedian(detect_t_vec)

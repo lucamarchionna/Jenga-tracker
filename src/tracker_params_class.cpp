@@ -330,13 +330,6 @@ void tracking::learning_process()
   std::vector<double> times_vec;
   std::vector<double> train_t_vec;
   std::vector<double> detect_t_vec;
-
-  //Initialize the writer.
-  if (opt_learn && opt_display_features){
-    vpIoTools::makeDirectory(vpIoTools::getParent(opt_learning_data).append("_cross"));
-    writer.setFileName(vpIoTools::getParent(opt_learning_data).append("_cross/image%04d.jpeg"));
-    writer.open(I_color);
-  }
   
   try {
     
@@ -553,21 +546,6 @@ void tracking::learning_process()
         // Build the reference keypoints
         keypoint.buildReference(I_color, trainKeyPoints, points3f, true, learn_id++);
 
-        if(opt_display_features){
-          writer.close();
-          // Display learned data
-          for (std::vector<cv::KeyPoint>::const_iterator it = trainKeyPoints.begin(); it != trainKeyPoints.end(); ++it) {
-            vpDisplay::displayCross(I_color, (int)it->pt.y, (int)it->pt.x, 10, vpColor::yellow, 3);
-            vpImageDraw::drawCross(I_color,vpImagePoint((int)it->pt.y, (int)it->pt.x), 10, vpColor::yellow, 2);
-            vpFont font(20);
-            std::stringstream ss;
-            ss << "Number: " << trainKeyPoints.size();
-            font.drawText(I_color, ss.str(), vpImagePoint(35,20), vpColor::red);
-          }
-          writer.saveFrame(I_color);
-          
-        }
-
         // Display saved learned image
         if (((learn_cpt-1)%4)==0){
           ILearned.insert(I_color,vpImagePoint(0,0));
@@ -754,13 +732,6 @@ void tracking::detection_process()
   std::vector<double> times_vec;
   std::vector<double> train_t_vec;
   std::vector<double> detect_t_vec;
-
-  //Initialize the writer.
-  if (opt_learn && opt_display_features){
-    vpIoTools::makeDirectory(vpIoTools::getParent(opt_learning_data).append("_cross"));
-    writer.setFileName(vpIoTools::getParent(opt_learning_data).append("_cross/image%04d.jpeg"));
-    writer.open(I_color);
-  }
   
   try {
     
@@ -1002,21 +973,6 @@ void tracking::detection_process()
 
         // Build the reference keypoints
         keypoint.buildReference(I_color, trainKeyPoints, points3f, true, learn_id++);
-
-        if(opt_display_features){
-          writer.close();
-          // Display learned data
-          for (std::vector<cv::KeyPoint>::const_iterator it = trainKeyPoints.begin(); it != trainKeyPoints.end(); ++it) {
-            vpDisplay::displayCross(I_color, (int)it->pt.y, (int)it->pt.x, 10, vpColor::yellow, 3);
-            vpImageDraw::drawCross(I_color,vpImagePoint((int)it->pt.y, (int)it->pt.x), 10, vpColor::yellow, 2);
-            vpFont font(20);
-            std::stringstream ss;
-            ss << "Number: " << trainKeyPoints.size();
-            font.drawText(I_color, ss.str(), vpImagePoint(35,20), vpColor::red);
-          }
-          writer.saveFrame(I_color);
-          
-        }
 
         // Display saved learned image
         if (((learn_cpt-1)%4)==0){
