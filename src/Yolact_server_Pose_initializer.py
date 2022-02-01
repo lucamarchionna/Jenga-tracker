@@ -9,7 +9,6 @@ from std_msgs.msg import String
 
 # %%
 import numpy as np
-import pyrealsense2 as rs
 import time
 from warnings import catch_warnings
 with catch_warnings():
