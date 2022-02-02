@@ -40,11 +40,13 @@ add_message_files(
   FILES
   ReferenceBlock.msg
   angle_velocity.msg
+  location.msg
 )
 
 add_service_files(
   FILES
   YolactInitializeCaoPose.srv
+  FirstLayerPose.srv
 )
 
 generate_messages(
@@ -117,21 +119,21 @@ catkin_package(
 #   ${${PROJECT_NAME}_EXPORTED_TARGETS}
 # )
 
-add_executable(tracker_sim
-  src/tracker_sim.cpp
-)
+# add_executable(tracker_sim
+#   src/tracker_sim.cpp
+# )
 
-target_link_libraries(tracker_sim
-  ${catkin_LIBRARIES}
-  ${VISP_LIBRARIES}
-  ${realsense2_LIBRARY}
-  ${PCL_LIBRARIES}
-)
+# target_link_libraries(tracker_sim
+#   ${catkin_LIBRARIES}
+#   ${VISP_LIBRARIES}
+#   ${realsense2_LIBRARY}
+#   ${PCL_LIBRARIES}
+# )
 
-add_dependencies(tracker_sim
-  ${catkin_EXPORTED_TARGETS}
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-)
+# add_dependencies(tracker_sim
+#   ${catkin_EXPORTED_TARGETS}
+#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
+# )
 
 add_executable(detection
   src/tracker_params_class.cpp
