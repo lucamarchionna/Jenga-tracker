@@ -271,23 +271,22 @@ class Layer_group():
         return rvecs,tvecs
 
     def top_to_bottom3D(self,orientation,tower_height=18):
-        bott=np.array([0,self.b_height*tower_height,0])
+        self.bott=np.array([0,self.b_height*tower_height,0])
         if orientation=="left":
-            bottSx=np.array([self.b_width*1.5,self.b_height*tower_height,self.b_width*0.5])
-            bottCx=np.array([self.b_width*1.5,self.b_height*tower_height,self.b_width*1.5])
-            bottDx=np.array([self.b_width*1.5,self.b_height*tower_height,self.b_width*2.5])
+            self.bottSx=np.array([self.b_width*1.5,self.b_height*tower_height,self.b_width*0.5])
+            self.bottCx=np.array([self.b_width*1.5,self.b_height*tower_height,self.b_width*1.5])
+            self.bottDx=np.array([self.b_width*1.5,self.b_height*tower_height,self.b_width*2.5])
         elif orientation=="right":
-            bottSx=np.array([-self.b_width*1.5,self.b_height*tower_height,self.b_width*2.5])
-            bottCx=np.array([-self.b_width*1.5,self.b_height*tower_height,self.b_width*1.5])
-            bottDx=np.array([-self.b_width*1.5,self.b_height*tower_height,self.b_width*0.5])
-        return bott,bottSx,bottCx,bottDx
+            self.bottSx=np.array([-self.b_width*1.5,self.b_height*tower_height,self.b_width*2.5])
+            self.bottCx=np.array([-self.b_width*1.5,self.b_height*tower_height,self.b_width*1.5])
+            self.bottDx=np.array([-self.b_width*1.5,self.b_height*tower_height,self.b_width*0.5])
     
-    def project3D_draw(self,img,bott,bottSx,bottCx,bottDx,rvec,tvec,cam_mtx,cam_dist,width_offset=80):
+    def project3D_draw(self,img,rvec,tvec,cam_mtx,cam_dist,width_offset=80):
         img_draw=img.copy()
-        proj_bott,_=cv2.projectPoints(bott,rvec,tvec,cam_mtx,cam_dist)
-        proj_bottSx,_=cv2.projectPoints(bottSx,rvec,tvec,cam_mtx,cam_dist)
-        proj_bottCx,_=cv2.projectPoints(bottCx,rvec,tvec,cam_mtx,cam_dist)
-        proj_bottDx,_=cv2.projectPoints(bottDx,rvec,tvec,cam_mtx,cam_dist)
+        proj_bott,_=cv2.projectPoints(self.bott,rvec,tvec,cam_mtx,cam_dist)
+        proj_bottSx,_=cv2.projectPoints(self.bottSx,rvec,tvec,cam_mtx,cam_dist)
+        proj_bottCx,_=cv2.projectPoints(self.bottCx,rvec,tvec,cam_mtx,cam_dist)
+        proj_bottDx,_=cv2.projectPoints(self.bottDx,rvec,tvec,cam_mtx,cam_dist)
         proj_bott=np.squeeze(proj_bott).astype(np.int)-np.array([width_offset,0],dtype=np.int)
         proj_bottSx=np.squeeze(proj_bottSx).astype(np.int)-np.array([width_offset,0],dtype=np.int)
         proj_bottCx=np.squeeze(proj_bottCx).astype(np.int)-np.array([width_offset,0],dtype=np.int)
@@ -300,12 +299,12 @@ class Layer_group():
 
         return img_draw
     
-    def project3D_toBottom(self,orientation,bottom_group,bott,bottDx,bottSx,rvec,tvec,cam_mtx,cam_dist,width_offset=80):
-        proj_bott,_=cv2.projectPoints(bott,rvec,tvec,cam_mtx,cam_dist)
+    def project3D_toBottom(self,orientation,bottom_group,rvec,tvec,cam_mtx,cam_dist,width_offset=80):
+        proj_bott,_=cv2.projectPoints(self.bott,rvec,tvec,cam_mtx,cam_dist)
         proj_bott=np.squeeze(proj_bott).astype(np.float)-np.array([width_offset,0],dtype=np.float)
 
         if orientation=="right" and bottom_group.right0_block.block_type!='front_face':
-            proj_bottDx,_=cv2.projectPoints(bottDx,rvec,tvec,cam_mtx,cam_dist)
+            proj_bottDx,_=cv2.projectPoints(self.bottDx,rvec,tvec,cam_mtx,cam_dist)
             proj_bottDx=np.squeeze(proj_bottDx).astype(np.float)-np.array([width_offset,0],dtype=np.float)
             if (cv2.pointPolygonTest(bottom_group.right0_block.contour_max,proj_bott,True)>-20) or \
                 (cv2.pointPolygonTest(bottom_group.right0_block.contour_max,proj_bottDx,True)>-20):
@@ -314,7 +313,7 @@ class Layer_group():
             else: 
                 return False
         elif orientation=="left" and bottom_group.left0_block.block_type!='front_face':
-            proj_bottSx,_=cv2.projectPoints(bottSx,rvec,tvec,cam_mtx,cam_dist)
+            proj_bottSx,_=cv2.projectPoints(self.bottSx,rvec,tvec,cam_mtx,cam_dist)
             proj_bottSx=np.squeeze(proj_bottSx).astype(np.float)-np.array([width_offset,0],dtype=np.float)
             if (cv2.pointPolygonTest(bottom_group.left0_block.contour_max,proj_bott,True)>-20) or \
                 (cv2.pointPolygonTest(bottom_group.left0_block.contour_max,proj_bottSx,True)>-20):

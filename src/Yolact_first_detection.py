@@ -49,7 +49,7 @@ def pnp_to_firstLayerPose(rvec_o,tvec_o):
       cTlayer1_msg.location.orientation="right"
     else:
       cTlayer1_msg.location.orientation="left"
-    cTlayer1_msg.location.layer=1
+    cTlayer1_msg.location.layer=18
     cTlayer1_msg.pose.header.frame_id="camera_color_optical_frame"
     cTlayer1_msg.pose.pose.position.x=tvec[0]
     cTlayer1_msg.pose.pose.position.y=tvec[1]
@@ -90,9 +90,9 @@ class First_layer_client():
     self.rosPath=rosPath
     self.yolact_path=yolact_path
 
+    ## Net config
     self.cfg_name='yolact_resnet101_jenga_dataset_new_config'
     self.weights_path=os.path.join(self.yolact_path,'weights/yolact_resnet101_jenga_dataset_new_1199_180000.pth')
-
     ##### Setup #####
     if torch.cuda.is_available():
         torch.backends.cudnn.fastest = True
@@ -103,9 +103,7 @@ class First_layer_client():
         torch.set_default_tensor_type('torch.FloatTensor')
         set_cfg(self.cfg_name)
         self.net=Yolact().cpu()
-
     self.transform = FastBaseTransform()
-
     self.net.load_weights(self.weights_path)
     self.net.eval()
 
@@ -232,40 +230,17 @@ class First_layer_client():
           # print("Bottom center: ",bottom_group.is_central())
           bottom_groups.append(bottom_group)
       self.img_imshow=np.hstack((img_all_masks,top3_masks,bottom3_masks))
-
-      # # DRAW STUFF TO SHOW
-      # top_img1=np.zeros((self.width,self.height,3),dtype=np.uint8)
-      # top_img2=np.zeros((self.width,self.height,3),dtype=np.uint8)
-      # if (len(top_groups)==2):
-      #   top_img1=top_groups[0].draw_masked_group(img)
-      #   top_test_points1=top_groups[0].get_drawn_search_img()
-      #   top_img2=top_groups[1].draw_masked_group(img)
-      #   top_test_points2=top_groups[1].get_drawn_search_img()
-      #   stack1=np.hstack((top_test_points1,top_img1))
-      #   stack2=np.hstack((top_test_points2,top_img2))
-      #   self.top_show=np.vstack((stack1,stack2))
-      # bottom_img1=np.zeros((self.width,self.height,3),dtype=np.uint8)
-      # bottom_img2=np.zeros((self.width,self.height,3),dtype=np.uint8)
-      # if (len(bottom_groups)==2):
-      #   bottom_img1=bottom_groups[0].draw_masked_group(img)
-      #   bottom_test_points1=bottom_groups[0].get_drawn_search_img()
-      #   bottom_img2=bottom_groups[1].draw_masked_group(img)
-      #   bottom_test_points2=bottom_groups[1].get_drawn_search_img()
-      #   stack1=np.hstack((bottom_test_points1,bottom_img1))
-      #   stack2=np.hstack((bottom_test_points2,bottom_img2))
-      #   self.bottom_show=np.vstack((stack1,stack2))
-
     # %%
     ## Find top central and bottom central groups
     top_central_numbers=0
     for top_group in top_groups:
       if top_group.is_central():
-        chosen_first_layer=top_group
+        first_layer=top_group
         top_central_numbers+=1
     bottom_central_numbers=0
     for bottom_group in bottom_groups:
       if bottom_group.is_central():
-        chosen_last_layer=bottom_group
+        last_layer=bottom_group
         bottom_central_numbers+=1
 
     # %%
@@ -284,9 +259,9 @@ class First_layer_client():
     # %%
     #Pose estimate of topmost
     if top_central_numbers==1 and bottom_central_numbers==1:
-      chosen_first_layer.setup_object_frame(b_width,b_height,b_length,zend_T_o)
-      # chosen_last_layer.setup_object_frame(b_width,b_height,b_length,zend_T_o)
-      rvec_first,tvec_first=chosen_first_layer.poseEstimate(width_offset,self.cam_mtx,self.cam_dist)
+      first_layer.setup_object_frame(b_width,b_height,b_length,zend_T_o)
+      # last_layer.setup_object_frame(b_width,b_height,b_length,zend_T_o)
+      rvec_first,tvec_first=first_layer.poseEstimate(width_offset,self.cam_mtx,self.cam_dist)
 
       #Draw frame axes on image
       img_big=np.zeros((self.cam_height,self.cam_width,3),dtype=np.uint8)
@@ -297,14 +272,17 @@ class First_layer_client():
       # From pose estimation to service request message
       found_msg,cTlayer1_msg = pnp_to_firstLayerPose(rvec_first,tvec_first)
 
+      bl_orientation=cTlayer1_msg.location.orientation
       # From top to bottom, object frame 3D translations
-      bott,bottSx,bottCx,bottDx = chosen_first_layer.top_to_bottom3D(cTlayer1_msg.location.orientation,8)
+      ### NUMBER OF TOWER FLOORS##
+      ######################################
+      first_layer.top_to_bottom3D(bl_orientation,8)
 
       # Check and draw bottom translation projections 3d into 2d
-      img_check_bottom=chosen_first_layer.project3D_draw(img_big[:,80:560],bott,bottSx,bottCx,bottDx,rvec_first,tvec_first,self.cam_mtx,self.cam_dist,width_offset)
+      img_check_bottom=first_layer.project3D_draw(img_big[:,80:560],rvec_first,tvec_first,self.cam_mtx,self.cam_dist,width_offset)
       self.img_imshow=np.hstack((img_check_bottom,top3_masks,bottom3_masks))
 
-      if (chosen_first_layer.project3D_toBottom(cTlayer1_msg.location.orientation,chosen_last_layer,bott,bottDx,bottSx,rvec_first,tvec_first,self.cam_mtx,self.cam_dist,width_offset)):
+      if (first_layer.project3D_toBottom(bl_orientation,last_layer,rvec_first,tvec_first,self.cam_mtx,self.cam_dist,width_offset)):
         return found_msg,cTlayer1_msg
       else:
         found_msg=Bool()
