@@ -183,6 +183,18 @@ class Block():
             cv2.line(temp,self.centroid,self.test_left0,[0,255,0],thickness=2)
         return temp
     
+    def draw_layer_test_points(self,img,min_slope_h=2):
+        '''Requires slopes and compute_test_points first'''
+        #self.compute_slopes(min_slope_h)
+        #self.compute_test_points(min_slope_h)
+        ######################
+        temp=img.copy()
+        if self.block_type=='front_face':
+            cv2.circle(temp,self.centroid,5,[255,255,0],thickness=-1)
+            cv2.line(temp,self.centroid,self.test_right0,[0,0,255],thickness=2)
+            cv2.line(temp,self.centroid,self.test_left0,[0,255,0],thickness=2)
+        return temp
+    
     def draw_additional_test_point(self,img,test_point,centroid,cv2color=[255,255,255]):
         temp=img.copy()
         if self.block_type=='front_face' and centroid!=(0,0):
@@ -232,6 +244,9 @@ class Block():
             self.test_upleft0,self.test_downleft0,self.test_upright1,self.test_downright1,self.test_upright0,\
             self.test_downright0,self.test_upleft1,self.test_downleft1,\
             self.test_up1,self.test_up1left0,self.test_up1right0,self.test_up1left1,self.test_up1right1
+
+    def get_centroid_height(self):
+        return self.centroid[1]
 
 
 if __name__=='__main__':
