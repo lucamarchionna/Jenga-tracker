@@ -318,16 +318,20 @@ if __name__ == "__main__":
       try:
         motion_service = rospy.ServiceProxy('/FirstLayerPose', FirstLayerPose)
         resp = motion_service(found_msg,cTlayer1_msg)
-        print(resp)
       except rospy.ServiceException as e:
         rospy.loginfo("Service call failed: %s"%e)
 
+      # If motion not ready, ask the server again
+      if not resp.ready:
+        continue
+
+      # If last time sent a found=true, exit loop
       if (found_msg.data):
         break
 
-      k=-1
-      # stay until correct frame captured
-      while (k==-1 and not rospy.is_shutdown()):
+      # k=-1
+      # # stay until correct frame captured
+      while (not rospy.is_shutdown()):
         # Get frameset of color
         frames = yolact_object.pipeline.wait_for_frames()
         color_frame = frames.get_color_frame()
@@ -337,14 +341,15 @@ if __name__ == "__main__":
         else:
           color_image = np.asanyarray(color_frame.get_data())
           cv2.imshow("Camera capture",color_image)
-          k=cv2.waitKey(10)
+          cv2.waitKey(10)
+          break
       
       found_msg,cTlayer1_msg = yolact_object.first_layer_detection(color_image)
 
       cv2.imshow("top3,bottom3",yolact_object.img_imshow) #imshow in the main, on the concurrent image
       k=-1
       while(k==-1 and not rospy.is_shutdown()):
-        k=cv2.waitKey(100) #red key in the image window
+        k=cv2.waitKey(5000) #red key in the image window
 
       # cv2.imshow("TopGroups",yolact_object.top_show) #imshow in the main, on the concurrent image
       # cv2.waitKey(0) #red key in the image window
