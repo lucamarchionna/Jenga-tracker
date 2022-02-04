@@ -37,7 +37,7 @@ from utils.augmentations import FastBaseTransform
 from layers.output_utils import postprocess
 
 # %%
-def to_PoseEstimationResponse(found,cao_path=None,rvec=None,tvec=None,position=None,layer=None):
+def to_PoseEstimationResponse(cao_path=None,rvec=None,tvec=None,position=None,layer=None):
   #From estimated pose to service message response
   initPose_msg=ReferenceBlock()
   cao_msg=String()
@@ -64,7 +64,10 @@ def to_PoseEstimationResponse(found,cao_path=None,rvec=None,tvec=None,position=N
   
   request=PoseEstimationResponse(cao_msg,initPose_msg)
 
-  return request
+  print(request)
+
+  return {"cao_path":cao_msg, "initPose":initPose_msg}
+  
 
 # %%
 class Yolact_pose_service():
@@ -131,6 +134,7 @@ class Yolact_pose_service():
   # %%
   def pose_service_handle(self,req):
 
+    print("Service called")
     # %%
     ## Convert messages into opencv formats
     msg_image=req.image
@@ -246,6 +250,7 @@ class Yolact_pose_service():
     img_big=cv2.drawFrameAxes(img_big,cam_mtx,cam_dist,rvec_est,tvec_est,0.03,thickness=2)
     img_all_masks=img_big[:,80:560].copy()
 
+    print("Search from policy")
     #Search block from estimate, projection
     policy_found=False
     for blocks_group in blocks_groups_list:
@@ -376,7 +381,7 @@ if __name__ == "__main__":
       if (yolact_object.newImage and not rospy.is_shutdown()):
         yolact_object.keyFromWindow=k
         yolact_object.newImage=False  #return waiting for a new image
-    # rospy.spin()
+    rospy.spin()
   except KeyboardInterrupt:
     rospy.loginfo('Shutting down...')
     cv2.destroyAllWindows()

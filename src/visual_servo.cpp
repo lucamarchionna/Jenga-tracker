@@ -6,7 +6,7 @@ using namespace std;
 visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh)
 {
 
-  client = node_handle.serviceClient<tracker_visp::YolactInitializeCaoPose>("/Pose_cao_initializer");
+  client = node_handle.serviceClient<tracker_visp::YolactInitializeCaoPose>("/YolactInitializeCaoPose");
   trackerEstimation = node_handle.advertise<geometry_msgs::Pose>("/pose_estimation", 1);
   velocityInput = node_handle.advertise<geometry_msgs::TwistStamped>("/servo_server/delta_twist_cmds", 1);
   startingPos = node_handle.advertise<geometry_msgs::PoseStamped>("/initialGuestPos", 1);
@@ -440,7 +440,7 @@ void visual_servoing::learning_process()
         sensor_msgs::CameraInfo sensor_camInfo = visp_bridge::toSensorMsgsCameraInfo(cam_color,width,height);
         // Send image and cam par to service, where Python node responds with cao_file and pose
         ROS_INFO("Subscribing to service...");
-        ros::service::waitForService("/YolactInitializeCaoPose",1000);
+        ros::service::waitForService("/YolactInitializeCaoPose"); 
         tracker_visp::YolactInitializeCaoPose srv;
         srv.request.image = sensor_image;
         srv.request.camInfo = sensor_camInfo;
