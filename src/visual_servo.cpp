@@ -439,12 +439,14 @@ void visual_servoing::learning_process()
       if(button == vpMouseButton::button1){
         sensor_msgs::Image sensor_image = visp_bridge::toSensorMsgsImage(I_color);
         sensor_msgs::CameraInfo sensor_camInfo = visp_bridge::toSensorMsgsCameraInfo(cam_color,width,height);
+        tracker_visp::ReferenceBlock cTo_est;        
         // Send image and cam par to service, where Python node responds with cao_file and pose
         ROS_INFO("Subscribing to service...");
         ros::service::waitForService("/Pose_cao_initializer",1000);
         tracker_visp::YolactInitializeCaoPose srv;
         srv.request.image = sensor_image;
         srv.request.camInfo = sensor_camInfo;
+        srv.request.cTo_est=cTo_est;
         ROS_INFO("Starting call to service..");
         if (client.call(srv))
         {

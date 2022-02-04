@@ -314,6 +314,15 @@ class Blocks_group():
 
         return self.masked_group
 
+    def is_project3D_target(self,rvec,tvec,cam_mtx,cam_dist,width_offset=80):
+        #TODO: consider if projection is slightly outside all
+        #TODO: use of position,orientation,(layer) to better filter the finding
+        target_pt=np.zeros(3,dtype=np.float)
+        proj_target,_=cv2.projectPoints(target_pt,rvec,tvec,cam_mtx,cam_dist)
+        proj_target=np.squeeze(proj_target).astype(np.float)-np.array([width_offset,0],dtype=np.float)
+
+        return (cv2.pointPolygonTest(self.start_block.contour_max,proj_target,False)==-1)
+
     def setup_object_frame(self,b_width,b_height,b_length,target_T_o=np.eye(4)):
         self.b_width=b_width
         self.b_height=b_height
