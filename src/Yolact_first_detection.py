@@ -352,9 +352,9 @@ if __name__ == "__main__":
       request = yolact_object.first_layer_detection(color_image)
 
       cv2.imshow("top3,bottom3",yolact_object.img_imshow) #imshow in the main, on the concurrent image
-      k=-1
-      while(k==-1 and not rospy.is_shutdown()):
-        k=cv2.waitKey(5000) #red key in the image window
+      # k=-1
+      # while(k==-1 and not rospy.is_shutdown()):
+      cv2.waitKey(5000) #red key in the image window
 
   except KeyboardInterrupt:
     rospy.loginfo('Shutting down...')
