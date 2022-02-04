@@ -15,9 +15,8 @@ visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh)
   // To wait a bit before publishing to /servo
   ros::Duration(1.0).sleep();
   init_parameters();
-  init_matrices();
-  init_servo();
   learning_process();
+
   ROS_INFO_STREAM("Leaning process finished");
   ros::Duration(1.0).sleep();
 
