@@ -2,6 +2,7 @@
 
 import rospy
 from tracker_visp.srv import FirstLayerPose
+from tracker_visp.srv import FirstLayerPoseRequest
 from tracker_visp.msg import ReferenceBlock
 from tracker_visp.msg import location
 from geometry_msgs.msg import Pose
@@ -38,18 +39,21 @@ from utils.augmentations import FastBaseTransform
 from layers.output_utils import postprocess
 
 # %%
-def pnp_to_firstLayerPose(rvec_o,tvec_o):
-    tvec=np.squeeze(tvec_o.copy())
-    rvec=np.squeeze(rvec_o.copy())
-    found_msg=Bool()
-    found_msg.data=True
-    cTlayer1_msg=ReferenceBlock()
-    cTlayer1_msg.location.position="cx"
+def to_FirstLayerPoseRequest(found,rvec=None,tvec=None,position=None,layer=None):
+  #From estimated pose to service message response
+  found_msg=Bool()
+  cTlayer1_msg=ReferenceBlock()
+  if found:
+    tvec=np.squeeze(tvec.copy())
+    rvec=np.squeeze(rvec.copy())
+    found_msg.data=found
+    cTlayer1_msg.location.position=position
     if rvec[1]<0:	#radians, "right face seen from camera"
       cTlayer1_msg.location.orientation="right"
     else:
       cTlayer1_msg.location.orientation="left"
-    cTlayer1_msg.location.layer=18
+    cTlayer1_msg.location.layer=layer
+    #Name of reference frame of pose
     cTlayer1_msg.pose.header.frame_id="camera_color_optical_frame"
     cTlayer1_msg.pose.pose.position.x=tvec[0]
     cTlayer1_msg.pose.pose.position.y=tvec[1]
@@ -59,9 +63,10 @@ def pnp_to_firstLayerPose(rvec_o,tvec_o):
     cTlayer1_msg.pose.pose.orientation.y=rvec_quat.y
     cTlayer1_msg.pose.pose.orientation.z=rvec_quat.z
     cTlayer1_msg.pose.pose.orientation.w=rvec_quat.w
+  
+  request=FirstLayerPoseRequest(found_msg,cTlayer1_msg)
 
-    return found_msg,cTlayer1_msg
-
+  return request
 # %%
 class First_layer_client():
   def __init__(self):
@@ -70,17 +75,20 @@ class First_layer_client():
     self.pipeline = rs.pipeline()
 
     # Create a config and configure the pipeline to stream
+    # Intrinsics
     self.cam_width=640
     self.cam_height=480
     self.cam_mtx=np.array([[598.365,0,327.306],[0,600.842,245.576],[0,0,1]])
     self.cam_dist=np.array([[]])
     # cam_dist=np.array([[0.0344852993,0.793592898,0.00571190879,-0.00303585594,-3.21784069]])
+
     self.config = rs.config()
     self.config.enable_stream(rs.stream.color, self.cam_width, self.cam_height, rs.format.bgr8, 30) #color enabled
 
     # Start streaming
     self.profile=self.pipeline.start(self.config)
 
+    #Squared images
     self.width=480
     self.height=480
     self.img_imshow=np.zeros((self.height,self.width*3,3),dtype=np.uint8)
@@ -91,9 +99,9 @@ class First_layer_client():
     self.yolact_path=yolact_path
 
     ## Net config
+    ##### Setup #####
     self.cfg_name='yolact_resnet101_jenga_dataset_new_config'
     self.weights_path=os.path.join(self.yolact_path,'weights/yolact_resnet101_jenga_dataset_new_1199_180000.pth')
-    ##### Setup #####
     if torch.cuda.is_available():
         torch.backends.cudnn.fastest = True
         torch.set_default_tensor_type('torch.cuda.FloatTensor')
@@ -108,6 +116,7 @@ class First_layer_client():
     self.net.eval()
 
   # %%
+  # Net usage
   def compute_outputs(self, img, score_threshold):
     h, w, _ = img.shape
     tensor_img=torch.from_numpy(img)
@@ -131,6 +140,7 @@ class First_layer_client():
     return classes, scores, boxes, masks
 
   # %%
+  # Big client function
   def first_layer_detection(self,color_image):
     # %%
     img_name=os.path.join(self.yolact_path,"input_images",str(time.time())+".png")
@@ -150,10 +160,7 @@ class First_layer_client():
     # %%
     if len(masks)==0:
       rospy.loginfo("No blocks found")
-      found_msg=Bool()
-      found_msg.data=False
-      cTlayer1_msg=ReferenceBlock() 
-      return found_msg,cTlayer1_msg
+      return to_FirstLayerPoseRequest(False)
 
     # %%
     totArea=0
@@ -189,15 +196,12 @@ class First_layer_client():
       img_all_masks+=block.draw_masked_approx(img)
 
     # %%
-    self.img_imshow=np.zeros((self.width,self.height*3,3),dtype=np.uint8)
+    self.img_imshow=np.zeros((self.height,self.width*3,3),dtype=np.uint8)
 
     ## Exit if less than 6 blocks found
     if len(blocks_list)<6:
       rospy.loginfo("Not enough blocks found, less than 6")
-      found_msg=Bool()
-      found_msg.data=False
-      cTlayer1_msg=ReferenceBlock() 
-      return found_msg,cTlayer1_msg
+      return to_FirstLayerPoseRequest(False)
     else:
       ## Sort blocks_list for centroid height
       blocks_list_ordered=sorted(blocks_list,key=Block.get_centroid_height)
@@ -258,9 +262,11 @@ class First_layer_client():
 
     # %%
     #Pose estimate of topmost
+    # CONTINUE only if top and bottom layers are full
     if top_central_numbers==1 and bottom_central_numbers==1:
       first_layer.setup_object_frame(b_width,b_height,b_length,zend_T_o)
       # last_layer.setup_object_frame(b_width,b_height,b_length,zend_T_o)
+
       rvec_first,tvec_first=first_layer.poseEstimate(width_offset,self.cam_mtx,self.cam_dist)
 
       #Draw frame axes on image
@@ -269,32 +275,33 @@ class First_layer_client():
       img_big=cv2.drawFrameAxes(img_big,self.cam_mtx,self.cam_dist,rvec_first,tvec_first,0.03,thickness=3)
       self.img_imshow=np.hstack((img_big,top3_masks,bottom3_masks))
 
-      # From pose estimation to service request message
-      found_msg,cTlayer1_msg = pnp_to_firstLayerPose(rvec_first,tvec_first)
+      first_layer_number=18
 
-      bl_orientation=cTlayer1_msg.location.orientation
+      # From pose estimation to service request message
+      request = to_FirstLayerPoseRequest(True,rvec_first,tvec_first,"cx",first_layer_number)
+      bl_orientation=request.cTlayer1.location.orientation
+
       # From top to bottom, object frame 3D translations
       ### NUMBER OF TOWER FLOORS##
       ######################################
-      first_layer.top_to_bottom3D(bl_orientation,8)
+      first_layer.top_to_bottom3D(bl_orientation,first_layer_number)
 
       # Check and draw bottom translation projections 3d into 2d
       img_check_bottom=first_layer.project3D_draw(img_big[:,80:560],rvec_first,tvec_first,self.cam_mtx,self.cam_dist,width_offset)
       self.img_imshow=np.hstack((img_check_bottom,top3_masks,bottom3_masks))
 
+      # Projecting number of floors below to bottom, check if hits the bottom floor detected
+      # If yes, top and bottom are really detected
       if (first_layer.project3D_toBottom(bl_orientation,last_layer,rvec_first,tvec_first,self.cam_mtx,self.cam_dist,width_offset)):
-        return found_msg,cTlayer1_msg
+        return request
       else:
-        found_msg=Bool()
-        found_msg.data=False
-        cTlayer1_msg=ReferenceBlock()
-        return found_msg,cTlayer1_msg
+        # Otherwise, not found
+        rospy.loginfo("Projection to bottom failed")
+        return to_FirstLayerPoseRequest(False)
     # %%
     # ELSE; RETURN empty
-    found_msg=Bool()
-    found_msg.data=False
-    cTlayer1_msg=ReferenceBlock()
-    return found_msg,cTlayer1_msg
+    rospy.loginfo("Not full, central layers")
+    return to_FirstLayerPoseRequest(False)
 
 # %%
 if __name__ == "__main__":
@@ -302,13 +309,9 @@ if __name__ == "__main__":
   # client=rospy.client('First_layer_detection',FirstLayerPose)
   yolact_object=First_layer_client()
   
-  found_msg=Bool()
-  found_msg.data=False
-  cTlayer1_msg=ReferenceBlock() 
+  request=to_FirstLayerPoseRequest(False)
 
   cv2.namedWindow("top3,bottom3")
-  # cv2.namedWindow("TopGroups")
-  # cv2.namedWindow("BottomGroups")
   cv2.namedWindow("Camera capture")
   try:
     # cycle until finding layer, after sending it
@@ -316,8 +319,9 @@ if __name__ == "__main__":
       #wait for service
       rospy.wait_for_service('/FirstLayerPose')
       try:
+        #Send to service, 
         motion_service = rospy.ServiceProxy('/FirstLayerPose', FirstLayerPose)
-        resp = motion_service(found_msg,cTlayer1_msg)
+        resp = motion_service(request)
       except rospy.ServiceException as e:
         rospy.loginfo("Service call failed: %s"%e)
 
@@ -326,7 +330,7 @@ if __name__ == "__main__":
         continue
 
       # If last time sent a found=true, exit loop
-      if (found_msg.data):
+      if (request.found.data):
         break
 
       # k=-1
@@ -344,19 +348,14 @@ if __name__ == "__main__":
           cv2.waitKey(10)
           break
       
-      found_msg,cTlayer1_msg = yolact_object.first_layer_detection(color_image)
+      # Detect first layer from current image
+      request = yolact_object.first_layer_detection(color_image)
 
       cv2.imshow("top3,bottom3",yolact_object.img_imshow) #imshow in the main, on the concurrent image
       k=-1
       while(k==-1 and not rospy.is_shutdown()):
         k=cv2.waitKey(5000) #red key in the image window
 
-      # cv2.imshow("TopGroups",yolact_object.top_show) #imshow in the main, on the concurrent image
-      # cv2.waitKey(0) #red key in the image window
-
-      # cv2.imshow("BottomGroups",yolact_object.bottom_show) #imshow in the main, on the concurrent image
-      # cv2.waitKey(0) #red key in the image window
-  
   except KeyboardInterrupt:
     rospy.loginfo('Shutting down...')
   finally:
