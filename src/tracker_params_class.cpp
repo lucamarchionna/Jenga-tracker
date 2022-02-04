@@ -270,7 +270,7 @@ void tracking::learning_process()
             ROS_INFO("Response from service..");
             opt_model=srv.response.caoFilePath.data;
             if (opt_model!=""){
-              geometry_msgs::Transform initPose=srv.response.initPose;
+              geometry_msgs::Pose initPose=srv.response.initPose.pose.pose;
               cMo=visp_bridge::toVispHomogeneousMatrix(initPose);	//object pose cMo
               tracker->loadModel(opt_model, opt_model);
               mapOfCameraPoses["Camera1"] = cMo;
@@ -687,7 +687,7 @@ void tracking::detection_process()
     {
       ROS_INFO("Response from service..");
       opt_model=srv.response.caoFilePath.data;
-      geometry_msgs::Transform initPose=srv.response.initPose;
+      geometry_msgs::Pose initPose=srv.response.initPose.pose.pose;
       cMo=visp_bridge::toVispHomogeneousMatrix(initPose);
       tracker->loadModel(opt_model, opt_model);
       mapOfCameraPoses["Camera1"] = cMo;

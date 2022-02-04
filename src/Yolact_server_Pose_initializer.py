@@ -2,7 +2,8 @@
 
 from numpy.core.fromnumeric import reshape
 import rospy
-from tracker_visp.srv import YolactInitializeCaoPose
+from tracker_visp.srv import *
+from tracker_visp.msg import *
 from geometry_msgs.msg import Transform
 from std_msgs.msg import String
 #from cv_bridge import CvBridge
@@ -36,6 +37,36 @@ from yolact import Yolact
 from data import set_cfg
 from utils.augmentations import FastBaseTransform
 from layers.output_utils import postprocess
+
+# %%
+def to_YolactInitializeCaoPoseResponse(cao_path,rvec=None,tvec=None,position=None,layer=None):
+  #From estimated pose to service message response
+  initPose_msg=ReferenceBlock()
+  cao_msg=String()
+  if cao_path!="":
+    tvec=np.squeeze(tvec.copy())
+    rvec=np.squeeze(rvec.copy())
+    cao_msg.data=cao_path
+    initPose_msg.location.position=position
+    if rvec[1]<0:	#radians, "right face seen from camera"
+      initPose_msg.location.orientation="right"
+    else:
+      initPose_msg.location.orientation="left"
+    initPose_msg.location.layer=layer
+    #Name of reference frame of pose
+    initPose_msg.pose.header.frame_id="camera_color_optical_frame"
+    initPose_msg.pose.pose.position.x=tvec[0]
+    initPose_msg.pose.pose.position.y=tvec[1]
+    initPose_msg.pose.pose.position.z=tvec[2]
+    rvec_quat=quaternion.from_rotation_vector(rvec)
+    initPose_msg.pose.pose.orientation.x=rvec_quat.x
+    initPose_msg.pose.pose.orientation.y=rvec_quat.y
+    initPose_msg.pose.pose.orientation.z=rvec_quat.z
+    initPose_msg.pose.pose.orientation.w=rvec_quat.w
+  
+  request=FirstLayerPoseRequest(cao_msg,initPose_msg)
+
+  return request
 
 # %%
 class Yolact_pose_service():
@@ -130,11 +161,7 @@ class Yolact_pose_service():
 
     # %%
     if len(masks)==0:
-      cao_name_msg=String()
-      cao_name_msg.data=""
-      init_pose_msg=Transform()
-      rospy.loginfo("SERVICE HALTED BY USER")
-      return {'caoFilePath':cao_name_msg,'initPose':init_pose_msg}
+      return to_YolactInitializeCaoPoseResponse("")
 
     totArea=0
     blocks_list=[]
@@ -190,11 +217,8 @@ class Yolact_pose_service():
 
     # %%
     if len(blocks_list)<0:
-      cao_name_msg=String()
-      cao_name_msg.data=""
-      init_pose_msg=Transform()
       rospy.loginfo("SERVICE HALTED BY USER")
-      return {'caoFilePath':cao_name_msg,'initPose':init_pose_msg}
+      return to_YolactInitializeCaoPoseResponse("")
     else:
       ### LIST ALL GROUPS ###
       blocks_groups_list=[]
@@ -235,12 +259,9 @@ class Yolact_pose_service():
           ## WARNING: RETURN HERE ##
           ##
           if (k==27 and not selected_group):
-            cao_name_msg=String()
-            cao_name_msg.data=""
-            init_pose_msg=Transform()
-            self.img_imshow=np.zeros((self.width,self.height*2,3),dtype=np.uint8)
             rospy.loginfo("SERVICE HALTED BY USER")
-            return {'caoFilePath':cao_name_msg,'initPose':init_pose_msg}
+            self.img_imshow=np.zeros((self.width,self.height*2,3),dtype=np.uint8)
+            return to_YolactInitializeCaoPoseResponse("")
 
           if (k==ord('c') and not selected_group):
             chosen_blocks_group=random_block_group
@@ -283,21 +304,8 @@ class Yolact_pose_service():
     tvec,rvec=chosen_blocks_group.initPose_file_write(width_offset,initPose_file_name,cam_mtx,cam_dist)
 
     # %%
-    tvec=np.squeeze(tvec)
-    rvec=np.squeeze(rvec)
-    cao_name_msg=String()
-    cao_name_msg.data=cao_name
-    init_pose_msg=Transform()
-    init_pose_msg.translation.x=tvec[0]
-    init_pose_msg.translation.y=tvec[1]
-    init_pose_msg.translation.z=tvec[2]
-    rvec_quat=quaternion.from_rotation_vector(rvec)
-    init_pose_msg.rotation.x=rvec_quat.x
-    init_pose_msg.rotation.y=rvec_quat.y
-    init_pose_msg.rotation.z=rvec_quat.z
-    init_pose_msg.rotation.w=rvec_quat.w
     rospy.loginfo("---\nSUCCESFULLY ENDED\n---")
-    return {'caoFilePath':cao_name_msg,'initPose':init_pose_msg}
+    return to_YolactInitializeCaoPoseResponse(cao_name,rvec,tvec,"",0)
 
 # %%
 if __name__ == "__main__":
