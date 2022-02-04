@@ -272,11 +272,11 @@ class Layer_group():
 
     def top_to_bottom3D(self,orientation,tower_height=18):
         self.bott=np.array([0,self.b_height*tower_height,0])
-        if orientation=="left":
+        if orientation=="sx":
             self.bottSx=np.array([self.b_width*1.5,self.b_height*tower_height,self.b_width*0.5])
             self.bottCx=np.array([self.b_width*1.5,self.b_height*tower_height,self.b_width*1.5])
             self.bottDx=np.array([self.b_width*1.5,self.b_height*tower_height,self.b_width*2.5])
-        elif orientation=="right":
+        elif orientation=="dx":
             self.bottSx=np.array([-self.b_width*1.5,self.b_height*tower_height,self.b_width*2.5])
             self.bottCx=np.array([-self.b_width*1.5,self.b_height*tower_height,self.b_width*1.5])
             self.bottDx=np.array([-self.b_width*1.5,self.b_height*tower_height,self.b_width*0.5])
@@ -303,7 +303,7 @@ class Layer_group():
         proj_bott,_=cv2.projectPoints(self.bott,rvec,tvec,cam_mtx,cam_dist)
         proj_bott=np.squeeze(proj_bott).astype(np.float)-np.array([width_offset,0],dtype=np.float)
 
-        if orientation=="right" and bottom_group.right0_block.block_type!='front_face':
+        if orientation=="dx" and bottom_group.right0_block.block_type!='front_face':
             proj_bottDx,_=cv2.projectPoints(self.bottDx,rvec,tvec,cam_mtx,cam_dist)
             proj_bottDx=np.squeeze(proj_bottDx).astype(np.float)-np.array([width_offset,0],dtype=np.float)
             if (cv2.pointPolygonTest(bottom_group.right0_block.contour_max,proj_bott,True)>-20) or \
@@ -312,7 +312,7 @@ class Layer_group():
                 return True
             else: 
                 return False
-        elif orientation=="left" and bottom_group.left0_block.block_type!='front_face':
+        elif orientation=="sx" and bottom_group.left0_block.block_type!='front_face':
             proj_bottSx,_=cv2.projectPoints(self.bottSx,rvec,tvec,cam_mtx,cam_dist)
             proj_bottSx=np.squeeze(proj_bottSx).astype(np.float)-np.array([width_offset,0],dtype=np.float)
             if (cv2.pointPolygonTest(bottom_group.left0_block.contour_max,proj_bott,True)>-20) or \

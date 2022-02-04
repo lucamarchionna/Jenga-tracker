@@ -42,6 +42,7 @@ from layers.output_utils import postprocess
 def to_FirstLayerPoseRequest(found,rvec=None,tvec=None,position=None,layer=None):
   #From estimated pose to service message response
   found_msg=Bool()
+  found_msg.data=False
   cTlayer1_msg=ReferenceBlock()
   if found:
     tvec=np.squeeze(tvec.copy())
@@ -49,9 +50,9 @@ def to_FirstLayerPoseRequest(found,rvec=None,tvec=None,position=None,layer=None)
     found_msg.data=found
     cTlayer1_msg.location.position=position
     if rvec[1]<0:	#radians, "right face seen from camera"
-      cTlayer1_msg.location.orientation="right"
+      cTlayer1_msg.location.orientation="dx"
     else:
-      cTlayer1_msg.location.orientation="left"
+      cTlayer1_msg.location.orientation="sx"
     cTlayer1_msg.location.layer=layer
     #Name of reference frame of pose
     cTlayer1_msg.pose.header.frame_id="camera_color_optical_frame"
@@ -273,7 +274,7 @@ class First_layer_client():
       img_big=np.zeros((self.cam_height,self.cam_width,3),dtype=np.uint8)
       img_big[:,80:560]=img_all_masks.copy()
       img_big=cv2.drawFrameAxes(img_big,self.cam_mtx,self.cam_dist,rvec_first,tvec_first,0.03,thickness=3)
-      self.img_imshow=np.hstack((img_big,top3_masks,bottom3_masks))
+      self.img_imshow=np.hstack((img_big[:,80:560],top3_masks,bottom3_masks))
 
       first_layer_number=18
 
