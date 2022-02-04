@@ -37,7 +37,7 @@ from utils.augmentations import FastBaseTransform
 from layers.output_utils import postprocess
 
 # %%
-def to_YolactInitializeCaoPoseResponse(found,cao_path=None,rvec=None,tvec=None,position=None,layer=None):
+def to_PoseEstimationResponse(found,cao_path=None,rvec=None,tvec=None,position=None,layer=None):
   #From estimated pose to service message response
   initPose_msg=ReferenceBlock()
   cao_msg=String()
@@ -62,7 +62,7 @@ def to_YolactInitializeCaoPoseResponse(found,cao_path=None,rvec=None,tvec=None,p
     initPose_msg.pose.pose.orientation.z=rvec_quat.z
     initPose_msg.pose.pose.orientation.w=rvec_quat.w
   
-  request=YolactInitializeCaoPoseResponse(cao_msg,initPose_msg)
+  request=PoseEstimationResponse(cao_msg,initPose_msg)
 
   return request
 
@@ -103,7 +103,7 @@ class Yolact_pose_service():
     self.net.load_weights(self.weights_path)
     self.net.eval()
 
-    self.s=rospy.Service('Pose_cao_initializer',YolactInitializeCaoPose,self.pose_service_handle)
+    self.s=rospy.Service('/PoseEstimation',PoseEstimation,self.pose_service_handle)
 
   # %%
   def compute_outputs(self, img, score_threshold):
@@ -168,7 +168,7 @@ class Yolact_pose_service():
 
     # %%
     if len(masks)==0:
-      return to_YolactInitializeCaoPoseResponse("")
+      return to_PoseEstimationResponse("")
 
     totArea=0
     blocks_list=[]
@@ -225,7 +225,7 @@ class Yolact_pose_service():
     # %%
     if len(blocks_list)<0:
       rospy.loginfo("SERVICE HALTED BY USER")
-      return to_YolactInitializeCaoPoseResponse("")
+      return to_PoseEstimationResponse("")
     else:
       ### LIST ALL GROUPS ###
       blocks_groups_list=[]
@@ -260,7 +260,7 @@ class Yolact_pose_service():
       self.img_imshow=np.hstack((img_all_masks,img_zero))
       self.keyFromWindow=0
       rospy.loginfo("No block found for policy from projection")
-      return to_YolactInitializeCaoPoseResponse("")
+      return to_PoseEstimationResponse("")
 
     # Block found, draw and use its group
     rospy.loginfo("\nConfirm group pressing 'c', exit pressing 'esc'\n")
@@ -283,7 +283,7 @@ class Yolact_pose_service():
       if (k==27):
         rospy.loginfo("SERVICE HALTED BY USER")
         self.img_imshow=np.zeros((self.width,self.height*2,3),dtype=np.uint8)
-        return to_YolactInitializeCaoPoseResponse("")
+        return to_PoseEstimationResponse("")
       if (k==ord('c')):
         chosen_blocks_group=choice_group
         cv2.imwrite(img_name[:-3]+'-'+str(time.time())+img_name[-4:],self.img_imshow) 
@@ -314,7 +314,7 @@ class Yolact_pose_service():
     #       if (k==27 and not selected_group):
     #         rospy.loginfo("SERVICE HALTED BY USER")
     #         self.img_imshow=np.zeros((self.width,self.height*2,3),dtype=np.uint8)
-    #         return to_YolactInitializeCaoPoseResponse("")
+    #         return to_PoseEstimationResponse("")
     #       if (k==ord('c') and not selected_group):
     #         chosen_blocks_group=random_block_group
     #         selected_group=True
@@ -357,7 +357,7 @@ class Yolact_pose_service():
 
     # %%
     rospy.loginfo("---\nSUCCESFULLY ENDED\n---")
-    return to_YolactInitializeCaoPoseResponse(cao_name,rvec,tvec,"",0)
+    return to_PoseEstimationResponse(cao_name,rvec,tvec,"",0)
 
 # %%
 if __name__ == "__main__":
