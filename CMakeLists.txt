@@ -47,6 +47,8 @@ add_service_files(
   FILES
   YolactInitializeCaoPose.srv
   FirstLayerPose.srv
+  PoseEstimation.srv
+  BlockEstimation.srv
 )
 
 generate_messages(
@@ -135,21 +137,21 @@ catkin_package(
 #   ${${PROJECT_NAME}_EXPORTED_TARGETS}
 # )
 
-add_executable(detection
-  src/tracker_params_class.cpp
-)
+# add_executable(detection
+#   src/tracker_params_class.cpp
+# )
 
-target_link_libraries(detection
-  ${catkin_LIBRARIES}
-  ${VISP_LIBRARIES}
-  ${realsense2_LIBRARY}
-  ${PCL_LIBRARIES}
-)
+# target_link_libraries(detection
+#   ${catkin_LIBRARIES}
+#   ${VISP_LIBRARIES}
+#   ${realsense2_LIBRARY}
+#   ${PCL_LIBRARIES}
+# )
 
-add_dependencies(detection
-  ${catkin_EXPORTED_TARGETS}
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-)
+# add_dependencies(detection
+#   ${catkin_EXPORTED_TARGETS}
+#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
+# )
 
 # add_executable(tracker_params
 #   src/tracker_params.cpp
@@ -167,22 +169,39 @@ add_dependencies(detection
 #   ${${PROJECT_NAME}_EXPORTED_TARGETS}
 # )
 
-# Client
-# add_executable(client
-#   src/ros_client_pic.cpp
-# )
+# Realsense cpp Client
+add_executable(realsense_client
+  src/realsense_client_pic.cpp
+)
 
-# target_link_libraries(client
-#   ${catkin_LIBRARIES}
-#   ${VISP_LIBRARIES}
-#   ${realsense2_LIBRARY}
-#   ${PCL_LIBRARIES}
-# )
+target_link_libraries(realsense_client
+  ${catkin_LIBRARIES}
+  ${VISP_LIBRARIES}
+  ${realsense2_LIBRARY}
+  ${PCL_LIBRARIES}
+)
 
-# add_dependencies(client
-#   ${catkin_EXPORTED_TARGETS}
-#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
-# )
+add_dependencies(realsense_client
+  ${catkin_EXPORTED_TARGETS}
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+)
+
+# Picture Client
+add_executable(cpp_sendPic
+  src/ros_send_pic.cpp
+)
+
+target_link_libraries(cpp_sendPic
+  ${catkin_LIBRARIES}
+  ${VISP_LIBRARIES}
+  ${realsense2_LIBRARY}
+  ${PCL_LIBRARIES}
+)
+
+add_dependencies(cpp_sendPic
+  ${catkin_EXPORTED_TARGETS}
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+)
 
 # new tracker
 # add_executable(tracker_client
@@ -219,18 +238,18 @@ add_dependencies(detection
 # )
 
 #tracker+pbvs
-add_executable(visualServo
-  src/visual_servo.cpp
-)
+# add_executable(visualServo
+#   src/visual_servo.cpp
+# )
 
-target_link_libraries(visualServo
-  ${catkin_LIBRARIES}
-  ${VISP_LIBRARIES}
-  ${realsense2_LIBRARY}
-  ${PCL_LIBRARIES}
-)
+# target_link_libraries(visualServo
+#   ${catkin_LIBRARIES}
+#   ${VISP_LIBRARIES}
+#   ${realsense2_LIBRARY}
+#   ${PCL_LIBRARIES}
+# )
 
-add_dependencies(visualServo
-  ${catkin_EXPORTED_TARGETS}
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-)
+# add_dependencies(visualServo
+#   ${catkin_EXPORTED_TARGETS}
+#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
+# )

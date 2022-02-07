@@ -64,9 +64,7 @@ def to_PoseEstimationResponse(cao_path=None,rvec=None,tvec=None,position=None,la
   
   request=PoseEstimationResponse(cao_msg,initPose_msg)
 
-  print(request)
-
-  return {"cao_path":cao_msg, "initPose":initPose_msg}
+  return request
   
 
 # %%
@@ -251,6 +249,8 @@ class Yolact_pose_service():
     img_all_masks=img_big[:,80:560].copy()
 
     print("Search from policy")
+    # print("position:",tvec_est)
+    # print("orientation:",rvec_est)
     #Search block from estimate, projection
     policy_found=False
     for blocks_group in blocks_groups_list:

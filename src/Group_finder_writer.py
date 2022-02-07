@@ -321,7 +321,7 @@ class Blocks_group():
         proj_target,_=cv2.projectPoints(target_pt,rvec,tvec,cam_mtx,cam_dist)
         proj_target=np.squeeze(proj_target).astype(np.float)-np.array([width_offset,0],dtype=np.float)
 
-        return (cv2.pointPolygonTest(self.start_block.contour_max,proj_target,False)==-1)
+        return (cv2.pointPolygonTest(self.start_block.contour_max,proj_target,False)==1)
 
     def setup_object_frame(self,b_width,b_height,b_length,target_T_o=np.eye(4)):
         self.b_width=b_width

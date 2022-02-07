@@ -224,16 +224,16 @@ class First_layer_client():
           # print("TOP center: ",top_group.is_central())
           top_groups.append(top_group)
       
-      ## Group the bottom 3 blocks, draw their masks
+      ## DONT Group the bottom 3 blocks, draw their masks
       bottom3_masks=np.zeros(img.shape,dtype=np.uint8)
-      bottom_groups=[]
+      # bottom_groups=[]
       for block in bottom3_blocks:
         bottom3_masks+=block.draw_masked_approx(img)
-      for block in bottom3_blocks:
-        if block.block_type=='front_face':
-          bottom_group=Layer_group(bottom3_blocks,block.idx,bottom3_masks)
-          # print("Bottom center: ",bottom_group.is_central())
-          bottom_groups.append(bottom_group)
+      # for block in bottom3_blocks:
+      #   if block.block_type=='front_face':
+      #     bottom_group=Layer_group(bottom3_blocks,block.idx,bottom3_masks)
+      #     # print("Bottom center: ",bottom_group.is_central())
+      #     bottom_groups.append(bottom_group)
       self.img_imshow=np.hstack((img_all_masks,top3_masks,bottom3_masks))
     # %%
     ## Find top central and bottom central groups
@@ -242,11 +242,11 @@ class First_layer_client():
       if top_group.is_central():
         first_layer=top_group
         top_central_numbers+=1
-    bottom_central_numbers=0
-    for bottom_group in bottom_groups:
-      if bottom_group.is_central():
-        last_layer=bottom_group
-        bottom_central_numbers+=1
+    # bottom_central_numbers=0
+    # for bottom_group in bottom_groups:
+    #   if bottom_group.is_central():
+    #     last_layer=bottom_group
+    #     bottom_central_numbers+=1
 
     # %%
     # # Single block size and reference pose setup
@@ -264,9 +264,8 @@ class First_layer_client():
     # %%
     #Pose estimate of topmost
     # CONTINUE only if top and bottom layers are full
-    if top_central_numbers==1 and bottom_central_numbers==1:
+    if top_central_numbers==1:
       first_layer.setup_object_frame(b_width,b_height,b_length,zend_T_o)
-      # last_layer.setup_object_frame(b_width,b_height,b_length,zend_T_o)
 
       rvec_first,tvec_first=first_layer.poseEstimate(width_offset,self.cam_mtx,self.cam_dist)
 
@@ -290,10 +289,10 @@ class First_layer_client():
       # Check and draw bottom translation projections 3d into 2d
       img_check_bottom=first_layer.project3D_draw(img_big[:,80:560],rvec_first,tvec_first,self.cam_mtx,self.cam_dist,width_offset)
       self.img_imshow=np.hstack((img_check_bottom,top3_masks,bottom3_masks))
-
+    
       # Projecting number of floors below to bottom, check if hits the bottom floor detected
       # If yes, top and bottom are really detected
-      if (first_layer.project3D_toBottom(bl_orientation,last_layer,rvec_first,tvec_first,self.cam_mtx,self.cam_dist,width_offset)):
+      if (first_layer.project3D_toBottom(bl_orientation,bottom3_blocks,rvec_first,tvec_first,self.cam_mtx,self.cam_dist,width_offset)):
         return request
       else:
         # Otherwise, not found
@@ -337,16 +336,20 @@ if __name__ == "__main__":
       # k=-1
       # # stay until correct frame captured
       while (not rospy.is_shutdown()):
-        # Get frameset of color
-        frames = yolact_object.pipeline.wait_for_frames()
-        color_frame = frames.get_color_frame()
-        # Validate that frame is valid
-        if not color_frame:
-            continue
-        else:
-          color_image = np.asanyarray(color_frame.get_data())
-          cv2.imshow("Camera capture",color_image)
-          cv2.waitKey(10)
+        try:
+          # Get frameset of color
+          frames = yolact_object.pipeline.wait_for_frames()
+          color_frame = frames.get_color_frame()
+          # Validate that frame is valid
+          if not color_frame:
+              continue
+          else:
+            color_image = np.asanyarray(color_frame.get_data())
+            cv2.imshow("Camera capture",color_image)
+            cv2.waitKey(10)
+            break
+        except:
+          print("Realsense exception")
           break
       
       # Detect first layer from current image

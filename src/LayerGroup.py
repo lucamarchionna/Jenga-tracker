@@ -299,28 +299,26 @@ class Layer_group():
 
         return img_draw
     
-    def project3D_toBottom(self,orientation,bottom_group,rvec,tvec,cam_mtx,cam_dist,width_offset=80):
+    def project3D_toBottom(self,orientation,bottom3_blocks,rvec,tvec,cam_mtx,cam_dist,width_offset=80):
         proj_bott,_=cv2.projectPoints(self.bott,rvec,tvec,cam_mtx,cam_dist)
         proj_bott=np.squeeze(proj_bott).astype(np.float)-np.array([width_offset,0],dtype=np.float)
 
-        if orientation=="dx" and bottom_group.right0_block.block_type!='front_face':
-            proj_bottDx,_=cv2.projectPoints(self.bottDx,rvec,tvec,cam_mtx,cam_dist)
-            proj_bottDx=np.squeeze(proj_bottDx).astype(np.float)-np.array([width_offset,0],dtype=np.float)
-            if (cv2.pointPolygonTest(bottom_group.right0_block.contour_max,proj_bott,True)>-20) or \
-                (cv2.pointPolygonTest(bottom_group.right0_block.contour_max,proj_bottDx,True)>-20):
-                #found bottom layer
-                return True
-            else: 
-                return False
-        elif orientation=="sx" and bottom_group.left0_block.block_type!='front_face':
-            proj_bottSx,_=cv2.projectPoints(self.bottSx,rvec,tvec,cam_mtx,cam_dist)
-            proj_bottSx=np.squeeze(proj_bottSx).astype(np.float)-np.array([width_offset,0],dtype=np.float)
-            if (cv2.pointPolygonTest(bottom_group.left0_block.contour_max,proj_bott,True)>-20) or \
-                (cv2.pointPolygonTest(bottom_group.left0_block.contour_max,proj_bottSx,True)>-20):
-                #found bottom layer
-                return True
-            else:
-                return False
+        for block_test in bottom3_blocks:
+            if orientation=="dx" and block_test.block_type!='front_face':
+                proj_bottDx,_=cv2.projectPoints(self.bottDx,rvec,tvec,cam_mtx,cam_dist)
+                proj_bottDx=np.squeeze(proj_bottDx).astype(np.float)-np.array([width_offset,0],dtype=np.float)
+                if (cv2.pointPolygonTest(block_test.contour_max,proj_bott,True)>-20) or \
+                    (cv2.pointPolygonTest(block_test.contour_max,proj_bottDx,True)>-20):
+                    #found bottom layer
+                    return True
+            elif orientation=="sx" and block_test.block_type!='front_face':
+                proj_bottSx,_=cv2.projectPoints(self.bottSx,rvec,tvec,cam_mtx,cam_dist)
+                proj_bottSx=np.squeeze(proj_bottSx).astype(np.float)-np.array([width_offset,0],dtype=np.float)
+                if (cv2.pointPolygonTest(block_test.contour_max,proj_bott,True)>-20) or \
+                    (cv2.pointPolygonTest(block_test.contour_max,proj_bottSx,True)>-20):
+                    #found bottom layer
+                    return True
+        return False
         
 if __name__=='__main__':
     print("Must be used as a class")

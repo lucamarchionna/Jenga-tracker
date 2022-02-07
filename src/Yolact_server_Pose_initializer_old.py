@@ -87,10 +87,12 @@ class Yolact_pose_service():
 
     #cfg_name='yolact_resnet101_jenga_dataset_config'
     self.cfg_name='yolact_resnet101_jenga_dataset_new_config'
+    # self.cfg_name='yolact_plus_resnet101_jenga_dataset_new_config'
     #weights_path=yolact_path+'/weights/yolact_resnet101_jenga_dataset_1916_230000.pth'
     #weights_path=yolact_path+'weights/yolact_resnet101_jenga_dataset_3399_340000.pth'
     #weights_path=yolact_path+'weights/yolact_resnet101_jenga_dataset_2099_210000.pth'
     self.weights_path=os.path.join(self.yolact_path,'weights/yolact_resnet101_jenga_dataset_new_1199_180000.pth')
+    # self.weights_path=os.path.join(self.yolact_path,'weights/yolact_plus_resnet101_jenga_dataset_new_44_5000.pth')
 
     ##### Setup #####
     if torch.cuda.is_available():
@@ -157,7 +159,7 @@ class Yolact_pose_service():
 
     # %%
     # Detection
-    classes, scores, boxes, masks = self.compute_outputs(img,0.5)
+    classes, scores, boxes, masks = self.compute_outputs(img,0.3)
     print("Detected --> ",len(masks))
 
     # %%
