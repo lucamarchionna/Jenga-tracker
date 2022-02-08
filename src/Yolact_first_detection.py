@@ -39,14 +39,14 @@ from utils.augmentations import FastBaseTransform
 from layers.output_utils import postprocess
 
 # %%
-def to_FirstLayerPoseRequest(found_top,found_bottom,rvec=None,tvec=None,position=None,layer=None):
+def to_FirstLayerPoseRequest(found_top,found_bottom,search_bottom=False,rvec=None,tvec=None,position=None,layer=None):
   #From estimated pose to service message response
   found_top_msg=Bool()
   found_top_msg.data=False
   found_bottom_msg=Bool()
   found_bottom_msg.data=False  
   cTlayer1_msg=ReferenceBlock()
-  if found_top or found_bottom:
+  if (not search_bottom and found_top) or found_bottom:
     tvec=np.squeeze(tvec.copy())
     rvec=np.squeeze(rvec.copy())
     found_top_msg.data=found_top
@@ -286,7 +286,7 @@ class First_layer_client():
       first_layer_number=18
 
       # From pose estimation to service request message
-      request = to_FirstLayerPoseRequest(True,False,rvec_first,tvec_first,"cx",first_layer_number)
+      request = to_FirstLayerPoseRequest(True,False,False,rvec_first,tvec_first,"cx",first_layer_number)
 
       return request
       # bl_orientation=request.cTlayer1.location.orientation
@@ -327,16 +327,16 @@ class First_layer_client():
       last_layer_number=18
 
       # From pose estimation to service request message
-      request = to_FirstLayerPoseRequest(True,True,rvec_last,tvec_last,"cx",last_layer_number)
+      request = to_FirstLayerPoseRequest(True,True,True,rvec_last,tvec_last,"cx",last_layer_number)
 
       return request
 
     if search_top:
       rospy.loginfo("Not full, top central layer")
-      return to_FirstLayerPoseRequest(False,False)
+      return to_FirstLayerPoseRequest(False,False,False)
     elif search_bottom:
       rospy.loginfo("Not full, bottom central layer")
-      return to_FirstLayerPoseRequest(True,False)      
+      return to_FirstLayerPoseRequest(True,False,True)      
 
 # %%
 if __name__ == "__main__":
