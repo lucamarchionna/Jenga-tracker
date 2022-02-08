@@ -3,7 +3,7 @@
 
 using namespace std;
 
-visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh)
+visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh), s(vpFeatureTranslation::cMo), s_star(vpFeatureTranslation::cMo), s_tu(vpFeatureThetaU::cdRc)
 {
 
   client = node_handle.serviceClient<tracker_visp::YolactInitializeCaoPose>("/YolactInitializeCaoPose");
@@ -11,7 +11,10 @@ visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh)
   velocityInput = node_handle.advertise<geometry_msgs::TwistStamped>("/servo_server/delta_twist_cmds", 1);
   startingPos = node_handle.advertise<geometry_msgs::PoseStamped>("/initialGuestPos", 1);
   servoPub = node_handle.advertise<tracker_visp::angle_velocity>("/servo", 1);
+  lastPose = node_handle.advertise<geometry_msgs::Pose>("/lastPose", 1);
+
   subLearning = node_handle.subscribe("/tracker_params/learning_phase", 1, &visual_servoing::learningCallback, this);
+  subForce = node_handle.subscribe("/retract", 1, &visual_servoing::forceCallback, this);
   // To wait a bit before publishing to /servo
   ros::Duration(1.0).sleep();
   init_parameters();
@@ -22,8 +25,6 @@ visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh)
 
   detection_process();
 
-  
-  
 }
 
 void visual_servoing::estimationCallback(const geometry_msgs::Pose& tracker_pose_P) 
@@ -73,24 +74,47 @@ void visual_servoing::estimationCallback(const geometry_msgs::Pose& tracker_pose
       // ros::Duration(3).sleep();
       // ROS_INFO("New pose took");
       take_cTo = false;
-      baseTtarget.print();
+      lastPose.publish(tracker_pose_P);
+      lastPoseReceived = tracker_pose_P;
     }
 
     else {    
       block_axis = true;
       //velocityData = approach(velocityData);
-      velocityData.twist.linear.z = 0.04;
-      velocityInput.publish(velocityData);
+
+      if (lastPoseReceived.position.z - camTtarget[2][3] < threshold_pose && retract == false )  {
+        ROS_INFO("New pose took");
+        signPoseReceived = 1.0; 
+        velocityData.twist.linear.z = signPoseReceived*0.04;
+        velocityInput.publish(velocityData);
+      }
+
+      else if (lastPoseReceived.position.z - camTtarget[2][3] < 0 && retract == true)  {
+        signPoseReceived = 0.0; 
+      }
+
+      else {
+        signPoseReceived = -1.0; 
+        velocityData.twist.linear.z = signPoseReceived*0.04;
+        velocityInput.publish(velocityData);
+        retract = true;
+      }
+
+
       }
     }
 
-
-
 }
 
+void visual_servoing::forceCallback(const std_msgs::BoolConstPtr& retract_call) 
+{
+  retract = retract_call->data;
 
+  if (retract) {
+    ROS_INFO("I am retracting");
+  }
 
-
+}
 vpHomogeneousMatrix visual_servoing::homogeneousTransformation(string link1, string link3) 
 {
 
@@ -264,12 +288,12 @@ int visual_servoing::init_matrices()
   static const std::string PLANNING_GROUP = "edo";
   moveit::planning_interface::MoveGroupInterface move_group_interface(PLANNING_GROUP);
   moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
+  camTtarget = homogeneousTransformation("camera_color_optical_frame", "handeye_target2");
+  targetTcam = homogeneousTransformation("handeye_target2", "camera_color_optical_frame");
+  baseTtarget = homogeneousTransformation("edo_base_link", "handeye_target2");
+  eeTtarget = homogeneousTransformation("edo_gripper_link_ee", "handeye_target2");
   eeTcam = homogeneousTransformation("edo_gripper_link_ee", "camera_color_optical_frame");
-  camTtarget = homogeneousTransformation("camera_color_optical_frame", "handeye_target");
-  targetTcam = homogeneousTransformation("handeye_target", "camera_color_optical_frame");
   baseTee = homogeneousTransformation("edo_base_link", "edo_gripper_link_ee");
-  baseTtarget = homogeneousTransformation("edo_base_link", "handeye_target");
-  eeTtarget = homogeneousTransformation("edo_gripper_link_ee", "handeye_target");
   camTee=homogeneousTransformation("edo_gripper_link_ee", "camera_color_optical_frame"); 
   camTbase = homogeneousTransformation("camera_color_optical_frame", "edo_base_link");
 
@@ -312,15 +336,20 @@ int visual_servoing::init_matrices()
   translZ = 0.27;   //the correct one is z = 0.134
 
   cdto.buildFrom(translX, translY, translZ);
-  vpRotationMatrix cdRo{1, 0, 0, 
+  vpRotationMatrix cdRo{1, 0, 0,
   0, 1, 0, 
   0, 0, 1};
 
   cdTtarget.buildFrom(cdto, cdRo);
 
+  cdTtarget.print();
+
   cdTc = cdTtarget*targetTcam;
 
+  cdTc.print();
+
   static tf2_ros::TransformBroadcaster br;
+  
   geometry_msgs::TransformStamped target;
 
   target.header.stamp = ros::Time::now();
@@ -510,6 +539,7 @@ void visual_servoing::learning_process()
     
     bool quit = false;
     static tf2_ros::TransformBroadcaster br;
+    static tf2_ros::StaticTransformBroadcaster br_static;
     // Define camera's RF for girst initialization
     wTc = homogeneousTransformation("world", "camera_color_optical_frame");
     vpTranslationVector t1; t1 << 0.0,0, 0;
@@ -614,6 +644,16 @@ void visual_servoing::learning_process()
       //cTo = cMo;
       //q_unit << 0, 0, 0, 1;
       //cTo.insert(q_unit); //only for simulation
+      geometry_msgs::Pose forward_IK = move_group.getCurrentPose("edo_link_ee").pose;
+      bTee = visp_bridge::toVispHomogeneousMatrix(forward_IK); 
+      vpThetaUVector bTee_tu = bTee.getThetaUVector();
+
+      
+      vpThetaUVector cMo_tu = cMo.getThetaUVector();
+      cMo_tu[0] = -(M_PI_2-bTee_tu[1]); 
+      cMo_tu[2] = 0; 
+      cMo.insert(cMo_tu);
+      
       geometry_msgs::TransformStamped pose_target = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target");
       br.sendTransform(pose_target);
 
@@ -675,8 +715,14 @@ void visual_servoing::learning_process()
       vpDisplay::flush(I_depth_color);
 
       if (vpDisplay::getClick(I_color, button, false)) {
-        if (button == vpMouseButton::button3)
+        if (button == vpMouseButton::button3) {
           quit = true;
+          geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
+          br_static.sendTransform(pose_target2);
+          init_matrices();
+          init_servo();
+        }
+
         else if (button == vpMouseButton::button1)
           learn_position = true;
       }
@@ -868,10 +914,7 @@ void visual_servoing::detection_process()
     eeTc1.buildFrom(t1, q_1);
     wTc1 = wTc*eeTc1.inverse();
 
-    init_matrices();
-    init_servo();
-
-    
+   
     //! [LOOP]
     //! -----------------------------------------------------------------------------------------------
     while (!quit && node_handle.ok() ) {
@@ -979,7 +1022,6 @@ void visual_servoing::detection_process()
       
       vpTranslationVector t_cam; t_cam << 0.54, 0.08, 0.4;
       vpQuaternionVector q_cam, q_unit; q_cam << 0, 0, 0.7071068, 0.7071068;
-      
       //eeTc.buildFrom(t_cam, q_cam);
       //geometry_msgs::TransformStamped camera_RF = toMoveit(eeTc, "world", "object");
       //br.sendTransform(camera_RF);
@@ -992,6 +1034,17 @@ void visual_servoing::detection_process()
       //cTo = cMo;
       //q_unit << 0, 0, 0, 1;
       //cTo.insert(q_unit); //only for simulation
+
+      geometry_msgs::Pose forward_IK = move_group.getCurrentPose("edo_link_ee").pose;
+      bTee = visp_bridge::toVispHomogeneousMatrix(forward_IK); 
+      vpThetaUVector bTee_tu = bTee.getThetaUVector();
+
+      
+      vpThetaUVector cMo_tu = cMo.getThetaUVector();
+      cMo_tu[0] = -(M_PI_2-bTee_tu[1]); 
+      cMo_tu[2] = 0; 
+      cMo.insert(cMo_tu);
+
       geometry_msgs::TransformStamped pose_target = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target");
       br.sendTransform(pose_target);
 
