@@ -215,6 +215,10 @@ class Block():
         self.test_downleft=(0,0)
         self.test_upright1=(0,0)
         self.test_downright1=(0,0)
+        self.test_up1left0=(0,0)
+        self.test_up1left1=(0,0)
+        self.test_up1right0=(0,0)        
+        self.test_up1right1=(0,0)        
         if self.block_type=='front_face':
             if self.versor_V[1]>0:  #versor going down
                 self.test_up=(int(self.centroid[0]-self.avgLength_V*self.versor_V[0]),int(self.centroid[1]-self.avgLength_V*self.versor_V[1]))
@@ -244,6 +248,64 @@ class Block():
             self.test_upleft0,self.test_downleft0,self.test_upright1,self.test_downright1,self.test_upright0,\
             self.test_downright0,self.test_upleft1,self.test_downleft1,\
             self.test_up1,self.test_up1left0,self.test_up1right0,self.test_up1left1,self.test_up1right1
+
+    def compute_down_test_points(self,min_slope_h=2):
+        '''Requires compute_slopes first'''
+        #self.compute_slopes(min_slope_h)
+        #####################
+        self.test_down=(0,0)
+        self.test_right0=(0,0)
+        self.test_right1=(0,0)
+        self.test_left0=(0,0)
+        self.test_left1=(0,0)
+        self.test_down1left0=(0,0)        
+        self.test_down1right0=(0,0)              
+        if self.block_type=='front_face':
+            if self.versor_V[1]>0:  #versor going down
+                self.test_up=(int(self.centroid[0]-self.avgLength_V*self.versor_V[0]),int(self.centroid[1]-self.avgLength_V*self.versor_V[1]))
+                self.test_down=(int(self.centroid[0]+self.avgLength_V*self.versor_V[0]),int(self.centroid[1]+self.avgLength_V*self.versor_V[1]))
+                self.test_down1=(int(self.centroid[0]+2*self.avgLength_V*self.versor_V[0]),int(self.centroid[1]+2*self.avgLength_V*self.versor_V[1]))
+            else: 
+                self.test_up=(int(self.centroid[0]+self.avgLength_V*self.versor_V[0]),int(self.centroid[1]+self.avgLength_V*self.versor_V[1]))
+                self.test_down=(int(self.centroid[0]-self.avgLength_V*self.versor_V[0]),int(self.centroid[1]-self.avgLength_V*self.versor_V[1]))
+                self.test_down1=(int(self.centroid[0]-2*self.avgLength_V*self.versor_V[0]),int(self.centroid[1]-2*self.avgLength_V*self.versor_V[1]))
+            self.test_right0=(int(self.centroid[0]+self.avgLength_H*self.versor_H[0]),int(self.centroid[1]+self.avgLength_H*self.versor_H[1]))
+            self.test_right1=(int(self.centroid[0]+2*self.avgLength_H*self.versor_H[0]),int(self.centroid[1]+2*self.avgLength_H*self.versor_H[1]))
+            self.test_left0=(int(self.centroid[0]-self.avgLength_H*self.versor_H[0]),int(self.centroid[1]-self.avgLength_H*self.versor_H[1]))
+            self.test_left1=(int(self.centroid[0]-2*self.avgLength_H*self.versor_H[0]),int(self.centroid[1]-2*self.avgLength_H*self.versor_H[1]))
+            self.test_down1left0=(int(self.test_down1[0]-self.avgLength_H*self.versor_H[0]),int(self.test_down1[1]-self.avgLength_H*self.versor_H[1]))
+            self.test_down1right0=(int(self.test_down1[0]+self.avgLength_H*self.versor_H[0]),int(self.test_down1[1]+self.avgLength_H*self.versor_H[1]))
+        return self.test_down,self.test_right0,self.test_right1,self.test_left0,self.test_left1,\
+            self.test_down1,self.test_down1left0,self.test_down1right0
+
+    def compute_up_test_points(self,min_slope_h=2):
+        '''Requires compute_slopes first'''
+        #self.compute_slopes(min_slope_h)
+        #####################
+        self.test_up=(0,0)
+        self.test_right0=(0,0)
+        self.test_right1=(0,0)
+        self.test_left0=(0,0)
+        self.test_left1=(0,0)
+        self.test_up1left0=(0,0)        
+        self.test_up1right0=(0,0)              
+        if self.block_type=='front_face':
+            if self.versor_V[1]>0:  #versor going down
+                self.test_up=(int(self.centroid[0]-self.avgLength_V*self.versor_V[0]),int(self.centroid[1]-self.avgLength_V*self.versor_V[1]))
+                self.test_down=(int(self.centroid[0]+self.avgLength_V*self.versor_V[0]),int(self.centroid[1]+self.avgLength_V*self.versor_V[1]))
+                self.test_up1=(int(self.centroid[0]-2*self.avgLength_V*self.versor_V[0]),int(self.centroid[1]-2*self.avgLength_V*self.versor_V[1]))
+            else: 
+                self.test_up=(int(self.centroid[0]+self.avgLength_V*self.versor_V[0]),int(self.centroid[1]+self.avgLength_V*self.versor_V[1]))
+                self.test_down=(int(self.centroid[0]-self.avgLength_V*self.versor_V[0]),int(self.centroid[1]-self.avgLength_V*self.versor_V[1]))
+                self.test_up1=(int(self.centroid[0]+2*self.avgLength_V*self.versor_V[0]),int(self.centroid[1]+2*self.avgLength_V*self.versor_V[1]))
+            self.test_right0=(int(self.centroid[0]+self.avgLength_H*self.versor_H[0]),int(self.centroid[1]+self.avgLength_H*self.versor_H[1]))
+            self.test_right1=(int(self.centroid[0]+2*self.avgLength_H*self.versor_H[0]),int(self.centroid[1]+2*self.avgLength_H*self.versor_H[1]))
+            self.test_left0=(int(self.centroid[0]-self.avgLength_H*self.versor_H[0]),int(self.centroid[1]-self.avgLength_H*self.versor_H[1]))
+            self.test_left1=(int(self.centroid[0]-2*self.avgLength_H*self.versor_H[0]),int(self.centroid[1]-2*self.avgLength_H*self.versor_H[1]))
+            self.test_up1left0=(int(self.test_up1[0]-self.avgLength_H*self.versor_H[0]),int(self.test_up1[1]-self.avgLength_H*self.versor_H[1]))
+            self.test_up1right0=(int(self.test_up1[0]+self.avgLength_H*self.versor_H[0]),int(self.test_up1[1]+self.avgLength_H*self.versor_H[1]))
+        return self.test_up,self.test_right0,self.test_right1,self.test_left0,self.test_left1,\
+            self.test_up1,self.test_up1left0,self.test_up1right0
 
     def get_centroid_height(self):
         return self.centroid[1]

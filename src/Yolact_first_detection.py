@@ -39,15 +39,18 @@ from utils.augmentations import FastBaseTransform
 from layers.output_utils import postprocess
 
 # %%
-def to_FirstLayerPoseRequest(found,rvec=None,tvec=None,position=None,layer=None):
+def to_FirstLayerPoseRequest(found_top,found_bottom,rvec=None,tvec=None,position=None,layer=None):
   #From estimated pose to service message response
-  found_msg=Bool()
-  found_msg.data=False
+  found_top_msg=Bool()
+  found_top_msg.data=False
+  found_bottom_msg=Bool()
+  found_bottom_msg.data=False  
   cTlayer1_msg=ReferenceBlock()
-  if found:
+  if found_top or found_bottom:
     tvec=np.squeeze(tvec.copy())
     rvec=np.squeeze(rvec.copy())
-    found_msg.data=found
+    found_top_msg.data=found_top
+    found_bottom_msg.data=found_bottom
     cTlayer1_msg.location.position=position
     if rvec[1]<0:	#radians, "right face seen from camera"
       cTlayer1_msg.location.orientation="dx"
@@ -65,7 +68,7 @@ def to_FirstLayerPoseRequest(found,rvec=None,tvec=None,position=None,layer=None)
     cTlayer1_msg.pose.pose.orientation.z=rvec_quat.z
     cTlayer1_msg.pose.pose.orientation.w=rvec_quat.w
   
-  request=FirstLayerPoseRequest(found_msg,cTlayer1_msg)
+  request=FirstLayerPoseRequest(found_top_msg,found_bottom_msg,cTlayer1_msg)
 
   return request
 # %%
@@ -142,7 +145,7 @@ class First_layer_client():
 
   # %%
   # Big client function
-  def first_layer_detection(self,color_image):
+  def first_layer_detection(self,color_image,search_top,search_bottom):
     # %%
     img_name=os.path.join(self.yolact_path,"input_images",str(time.time())+".png")
     cv2.imwrite(img_name,color_image)
@@ -161,7 +164,7 @@ class First_layer_client():
     # %%
     if len(masks)==0:
       rospy.loginfo("No blocks found")
-      return to_FirstLayerPoseRequest(False)
+      return to_FirstLayerPoseRequest(False,False)
 
     # %%
     totArea=0
@@ -202,7 +205,7 @@ class First_layer_client():
     ## Exit if less than 6 blocks found
     if len(blocks_list)<6:
       rospy.loginfo("Not enough blocks found, less than 6")
-      return to_FirstLayerPoseRequest(False)
+      return to_FirstLayerPoseRequest(False,False)
     else:
       ## Sort blocks_list for centroid height
       blocks_list_ordered=sorted(blocks_list,key=Block.get_centroid_height)
@@ -221,19 +224,21 @@ class First_layer_client():
       for block in top3_blocks:
         if block.block_type=='front_face':
           top_group=Layer_group(top3_blocks,block.idx,top3_masks)
+          top_group.init_up(top3_blocks)
           # print("TOP center: ",top_group.is_central())
           top_groups.append(top_group)
       
       ## DONT Group the bottom 3 blocks, draw their masks
       bottom3_masks=np.zeros(img.shape,dtype=np.uint8)
-      # bottom_groups=[]
+      bottom_groups=[]
       for block in bottom3_blocks:
         bottom3_masks+=block.draw_masked_approx(img)
-      # for block in bottom3_blocks:
-      #   if block.block_type=='front_face':
-      #     bottom_group=Layer_group(bottom3_blocks,block.idx,bottom3_masks)
-      #     # print("Bottom center: ",bottom_group.is_central())
-      #     bottom_groups.append(bottom_group)
+      for block in bottom3_blocks:
+        if block.block_type=='front_face':
+          bottom_group=Layer_group(bottom3_blocks,block.idx,bottom3_masks)
+          bottom_group.init_down(bottom3_blocks)
+          # print("Bottom center: ",bottom_group.is_central())
+          bottom_groups.append(bottom_group)
       self.img_imshow=np.hstack((img_all_masks,top3_masks,bottom3_masks))
     # %%
     ## Find top central and bottom central groups
@@ -242,11 +247,11 @@ class First_layer_client():
       if top_group.is_central():
         first_layer=top_group
         top_central_numbers+=1
-    # bottom_central_numbers=0
-    # for bottom_group in bottom_groups:
-    #   if bottom_group.is_central():
-    #     last_layer=bottom_group
-    #     bottom_central_numbers+=1
+    bottom_central_numbers=0
+    for bottom_group in bottom_groups:
+      if bottom_group.is_central():
+        last_layer=bottom_group
+        bottom_central_numbers+=1
 
     # %%
     # # Single block size and reference pose setup
@@ -262,9 +267,9 @@ class First_layer_client():
     zend_T_o[:3,3]=zend_t_o
 
     # %%
-    #Pose estimate of topmost
-    # CONTINUE only if top and bottom layers are full
-    if top_central_numbers==1:
+    #Pose estimate of topmost, if top is still to be searched
+    # CONTINUE only if top layer is full
+    if top_central_numbers==1 and search_top:
       first_layer.setup_object_frame(b_width,b_height,b_length,zend_T_o)
 
       rvec_first,tvec_first=first_layer.poseEstimate(width_offset,self.cam_mtx,self.cam_dist)
@@ -278,30 +283,54 @@ class First_layer_client():
       first_layer_number=18
 
       # From pose estimation to service request message
-      request = to_FirstLayerPoseRequest(True,rvec_first,tvec_first,"cx",first_layer_number)
-      bl_orientation=request.cTlayer1.location.orientation
+      request = to_FirstLayerPoseRequest(True,False,rvec_first,tvec_first,"cx",first_layer_number)
 
-      # From top to bottom, object frame 3D translations
-      ### NUMBER OF TOWER FLOORS##
-      ######################################
-      first_layer.top_to_bottom3D(bl_orientation,first_layer_number)
+      return request
+      # bl_orientation=request.cTlayer1.location.orientation
 
-      # Check and draw bottom translation projections 3d into 2d
-      img_check_bottom=first_layer.project3D_draw(img_big[:,80:560],rvec_first,tvec_first,self.cam_mtx,self.cam_dist,width_offset)
-      self.img_imshow=np.hstack((img_check_bottom,top3_masks,bottom3_masks))
+      # # From top to bottom, object frame 3D translations
+      # ### NUMBER OF TOWER FLOORS##
+      # ######################################
+      # first_layer.top_to_bottom3D(bl_orientation,first_layer_number)
+
+      # # Check and draw bottom translation projections 3d into 2d
+      # img_check_bottom=first_layer.project3D_draw(img_big[:,80:560],rvec_first,tvec_first,self.cam_mtx,self.cam_dist,width_offset)
+      # self.img_imshow=np.hstack((img_check_bottom,top3_masks,bottom3_masks))
     
-      # Projecting number of floors below to bottom, check if hits the bottom floor detected
-      # If yes, top and bottom are really detected
-      if (first_layer.project3D_toBottom(bl_orientation,bottom3_blocks,rvec_first,tvec_first,self.cam_mtx,self.cam_dist,width_offset)):
-        return request
-      else:
-        # Otherwise, not found
-        rospy.loginfo("Projection to bottom failed")
-        return to_FirstLayerPoseRequest(False)
-    # %%
-    # ELSE; RETURN empty
-    rospy.loginfo("Not full, central layers")
-    return to_FirstLayerPoseRequest(False)
+      # # Projecting number of floors below to bottom, check if hits the bottom floor detected
+      # # If yes, top and bottom are really detected
+      # if (first_layer.project3D_toBottom(bl_orientation,bottom3_blocks,rvec_first,tvec_first,self.cam_mtx,self.cam_dist,width_offset)):
+      #   return request
+      # else:
+      #   # Otherwise, not found
+      #   rospy.loginfo("Projection to bottom failed")
+      #   return to_FirstLayerPoseRequest(False,True,rvec_first,tvec_first,"cx",first_layer_number)
+    
+    elif bottom_central_numbers==1 and search_bottom:
+      #Pose estimate of bottomost, if bottom is still to be searched and top is already searched
+      # CONTINUE only if bottom layer is full
+      last_layer.setup_object_frame(b_width,b_height,b_length,zend_T_o)
+
+      rvec_last,tvec_last=last_layer.poseEstimate(width_offset,self.cam_mtx,self.cam_dist)
+
+      #Draw frame axes on image
+      img_big=np.zeros((self.cam_height,self.cam_width,3),dtype=np.uint8)
+      img_big[:,80:560]=img_all_masks.copy()
+      img_big=cv2.drawFrameAxes(img_big,self.cam_mtx,self.cam_dist,rvec_last,tvec_last,0.03,thickness=3)
+      self.img_imshow=np.hstack((img_big[:,80:560],top3_masks,bottom3_masks))
+
+      last_layer_number=18
+
+      # From pose estimation to service request message
+      request = to_FirstLayerPoseRequest(False,True,rvec_last,tvec_last,"cx",last_layer_number)
+
+      return request
+
+    if search_top:
+      rospy.loginfo("Not full, top central layer")
+    elif search_bottom:
+      rospy.loginfo("Not full, bottom central layer")
+    return to_FirstLayerPoseRequest(False,False)
 
 # %%
 if __name__ == "__main__":
@@ -309,7 +338,9 @@ if __name__ == "__main__":
   # client=rospy.client('First_layer_detection',FirstLayerPose)
   yolact_object=First_layer_client()
   
-  request=to_FirstLayerPoseRequest(False)
+  request=to_FirstLayerPoseRequest(False,False)
+  search_top=True
+  search_bottom=False
 
   cv2.namedWindow("top3,bottom3")
   cv2.namedWindow("Camera capture")
@@ -329,8 +360,8 @@ if __name__ == "__main__":
       if not resp.ready:
         continue
 
-      # If last time sent a found=true, exit loop
-      if (request.found.data):
+      # If last time sent a found both=true, exit loop
+      if (request.found_top.data and request.found_bottom.data):
         break
 
       # k=-1
@@ -353,7 +384,18 @@ if __name__ == "__main__":
           break
       
       # Detect first layer from current image
-      request = yolact_object.first_layer_detection(color_image)
+      if search_top:
+        request = yolact_object.first_layer_detection(color_image,search_top,search_bottom)
+        # keep searching if not found top layer
+        if request.found_top.data:
+          search_top=False
+          search_bottom=True
+      elif search_bottom:
+        request = yolact_object.first_layer_detection(color_image,search_top,search_bottom)
+        # keep searching if not found bottom layer
+        if request.found_bottom.data:
+          search_top=False
+          search_bottom=False
 
       cv2.imshow("top3,bottom3",yolact_object.img_imshow) #imshow in the main, on the concurrent image
       # k=-1

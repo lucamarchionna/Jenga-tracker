@@ -6,7 +6,7 @@ using namespace std;
 tracking::tracking(ros::NodeHandle& nh) : node_handle(nh)
 {
 
-  client = node_handle.serviceClient<tracker_visp::YolactInitializeCaoPose>("/Pose_cao_initializer");
+  client = node_handle.serviceClient<tracker_visp::YolactInitializeCaoPose>("/YolactInitializeCaoPose");
   trackerEstimation = node_handle.advertise<geometry_msgs::Pose>("/pose_estimation", 1);
   servoPub = node_handle.advertise<tracker_visp::angle_velocity>("/servo", 1);
   subLearning = node_handle.subscribe("/tracker_params/learning_phase", 1, &tracking::learningCallback, this);
@@ -261,7 +261,7 @@ void tracking::learning_process()
           sensor_msgs::CameraInfo sensor_camInfo = visp_bridge::toSensorMsgsCameraInfo(cam_color,width,height);
           // Send image and cam par to service, where Python node responds with cao_file and pose
           ROS_INFO("Subscribing to service...");
-          ros::service::waitForService("/Pose_cao_initializer",1000);
+          ros::service::waitForService("/YolactInitializeCaoPose");
           tracker_visp::YolactInitializeCaoPose srv;
           srv.request.image = sensor_image;
           srv.request.camInfo = sensor_camInfo;
@@ -419,13 +419,21 @@ void tracking::learning_process()
           run_auto_init = false;
         }
         tracker->track(mapOfImages, mapOfPointclouds, mapOfWidths, mapOfHeights);
-      } catch (const vpException &e) {
-        std::cout << "Tracker exception: " << e.getStringMessage() << std::endl;
-        tracking_failed = true;
-        if (opt_auto_init) {
-          //std::cout << "Tracker needs to restart (tracking exception)" << std::endl;
-          run_auto_init = true;
+      } 
+        catch (const std::length_error& le){
+          std::cerr << "Length error: " << le.what() << '\n';
+          if (opt_auto_init) {
+            //std::cout << "Tracker needs to restart (tracking exception)" << std::endl;
+            run_auto_init = true;
+          }
         }
+        catch (const vpException &e) {
+          std::cout << "Tracker exception: " << e.getStringMessage() << std::endl;
+          tracking_failed = true;
+          if (opt_auto_init) {
+            //std::cout << "Tracker needs to restart (tracking exception)" << std::endl;
+            run_auto_init = true;
+          }
       }
 
 
@@ -528,6 +536,25 @@ void tracking::learning_process()
       }
       if (vpDisplay::getClick(I_depth_color, false)) {
         quit = true;
+      }
+
+      //Rotating base, only once
+      //(to learn during rotation, receiving on topic)
+      if (!rotated && !tracking_failed) {
+        // SERVO SEND ANGLE
+        vpThetaUVector cTo_tu = cMo.getThetaUVector();
+        tracker_visp::angle_velocity angleVel_to_servo;
+        angleVel_to_servo.velocity = 0.01; //degrees/ms, velocity slow
+        // std::cout << "Theta: \n" << angle << std::endl;
+        if (cTo_tu[1]<0){	//radians, "right face seen from camera"
+          angleVel_to_servo.angle = 130;	//degrees, final angle
+          servoPub.publish(angleVel_to_servo);
+        }
+        else {	//radians, "left face seen from camera"
+          angleVel_to_servo.angle = 50;	//degrees, final angle
+          servoPub.publish(angleVel_to_servo);
+        }
+        rotated = true; 
       }
 
       // Loop time without training
@@ -691,7 +718,7 @@ void tracking::detection_process()
 	  sensor_msgs::CameraInfo sensor_camInfo = visp_bridge::toSensorMsgsCameraInfo(cam_color,width,height);
     // Send image and cam par to service, where Python node responds with cao_file and pose
     ROS_INFO("Subscribing to service...");
-    ros::service::waitForService("/Pose_cao_initializer");
+    ros::service::waitForService("/YolactInitializeCaoPose");
     srv.request.image = sensor_image;
     srv.request.camInfo = sensor_camInfo;
     ROS_INFO("Starting call to service..");
@@ -833,7 +860,15 @@ void tracking::detection_process()
           run_auto_init = false;
         }
         tracker->track(mapOfImages, mapOfPointclouds, mapOfWidths, mapOfHeights);
-      } catch (const vpException &e) {
+      } 
+        catch (const std::length_error& le){
+          std::cerr << "Length error: " << le.what() << '\n';
+          if (opt_auto_init) {
+            //std::cout << "Tracker needs to restart (tracking exception)" << std::endl;
+            run_auto_init = true;
+          }
+        }
+        catch (const vpException &e) {
         std::cout << "Tracker exception: " << e.getStringMessage() << std::endl;
         tracking_failed = true;
         if (opt_auto_init) {
@@ -843,28 +878,28 @@ void tracking::detection_process()
       }
 
 
-      //Rotating base
-      if (!rotated && !tracking_failed) {
+      // //Rotating base
+      // if (!rotated && !tracking_failed) {
 
-      // Run auto initialization from learned data
-        if ((opt_auto_init && keypoint.matchPoint(I_gray, cam_color, cMo)) || opt_yolact_init) {
+      // // Run auto initialization from learned data
+      //   if ((opt_auto_init && keypoint.matchPoint(I_gray, cam_color, cMo)) || opt_yolact_init) {
 
-        // SERVO SEND ANGLE
-          vpThetaUVector cTo_tu = cMo.getThetaUVector();
-          tracker_visp::angle_velocity angleVel_to_servo;
-          angleVel_to_servo.velocity = 0.01; //degrees/ms, velocity slow
-          // std::cout << "Theta: \n" << angle << std::endl;
-          if (cTo_tu[1]<0){	//radians, "right face seen from camera"
-            angleVel_to_servo.angle = 130;	//degrees, final angle
-            servoPub.publish(angleVel_to_servo);
-          }
-          else {	//radians, "left face seen from camera"
-            angleVel_to_servo.angle = 50;	//degrees, final angle
-            servoPub.publish(angleVel_to_servo);
-          } 
-        }
-        rotated = true;
-      }
+      //   // SERVO SEND ANGLE
+      //     vpThetaUVector cTo_tu = cMo.getThetaUVector();
+      //     tracker_visp::angle_velocity angleVel_to_servo;
+      //     angleVel_to_servo.velocity = 0.01; //degrees/ms, velocity slow
+      //     // std::cout << "Theta: \n" << angle << std::endl;
+      //     if (cTo_tu[1]<0){	//radians, "right face seen from camera"
+      //       angleVel_to_servo.angle = 130;	//degrees, final angle
+      //       servoPub.publish(angleVel_to_servo);
+      //     }
+      //     else {	//radians, "left face seen from camera"
+      //       angleVel_to_servo.angle = 50;	//degrees, final angle
+      //       servoPub.publish(angleVel_to_servo);
+      //     } 
+      //   }
+      //   rotated = true;
+      // }
 
 
 
