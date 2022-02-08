@@ -663,6 +663,11 @@ class Blocks_group():
             if len(ordered_corners)>0:
                 self.init_impt.append(ordered_corners)
                 self.init_objp.append(ordered_objp(self.target_move_left1))
+        if self.up1Idx!=-1 and self.up1_block.block_type=="front_face":
+            ordered_corners=self.up1_block.ordered_corners()
+            if len(ordered_corners)>0:
+                self.init_impt.append(ordered_corners)
+                self.init_objp.append(ordered_objp(self.target_move_up1))
         if self.up1left0Idx!=-1 and self.up1left0_block.block_type=="front_face":
             ordered_corners=self.up1left0_block.ordered_corners()
             if len(ordered_corners)>0:

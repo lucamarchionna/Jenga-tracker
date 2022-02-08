@@ -27,18 +27,40 @@ class Layer_group():
         self.right1_block=Block(-1,[],[],[],-1)
         self.left0_block=Block(-1,[],[],[],-1)
         self.left1_block=Block(-1,[],[],[],-1)
+        self.down_block=Block(-1,[],[],[],-1)
+        self.down1left0_block=Block(-1,[],[],[],-1)
+        self.down1right0_block=Block(-1,[],[],[],-1)
+        self.down1left1_block=Block(-1,[],[],[],-1)
+        self.down1right1_block=Block(-1,[],[],[],-1)        
 
         if self.start_block.block_type!='front_face':
             print("Not a front face block")
             return
             
-        _,_,test_right0,test_right1,test_left0,test_left1,_,_,_,_,_,_,_,_,_,_,_,_,_=self.start_block.compute_test_points()
+        test_down,test_right0,test_right1,test_left0,test_left1,\
+            test_down1,test_down1left0,test_down1right0=self.start_block.compute_down_test_points()
         self.img_cross=self.start_block.draw_layer_test_points(self.img_cross)
 
         #TEST Right left
         #only first found, mutually exclusive
         for block_test in blocks_list:
             if block_test.idx!=self.startIdx:
+                #Test down
+                if self.downIdx==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_down,False)==1):
+                    self.downIdx=block_test.idx
+                    self.down_block=block_test
+                #Test down1
+                if self.down1Idx==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_down1,False)==1):
+                    self.down1Idx=block_test.idx
+                    self.down1_block=block_test
+                #Test down1left0
+                if  self.down1left0Idx==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_down1left0,False)==1):
+                    self.down1left0Idx=block_test.idx
+                    self.down1left0_block=block_test
+                #Test down1right0
+                if self.down1right0Idx==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_down1right0,False)==1):
+                    self.down1right0Idx=block_test.idx
+                    self.down1right0_block=block_test
                 #Test right0
                 if self.rightIdx[0]==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_right0,False)==1):
                     self.rightIdx[0]=block_test.idx
@@ -46,7 +68,7 @@ class Layer_group():
                     #Then test right1
                     #only if right0 is front
                     if self.right0_block.block_type=='front_face':
-                        _,_,test_right1,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_=self.right0_block.compute_test_points()
+                        _,test_right1,_,_,_,_,_=self.right0_block.compute_down_test_points()
                         self.img_cross=self.start_block.draw_additional_test_point(self.img_cross,test_right1,self.right0_block.centroid,cv2color=[0,0,255])
                         for block_test1 in blocks_list:
                             if block_test1.idx!=self.startIdx and block_test1.idx!=self.rightIdx[0]:  #to be sure
@@ -60,7 +82,7 @@ class Layer_group():
                     #Then test left1
                     #only if left0 is front
                     if self.left0_block.block_type=='front_face':
-                        _,_,_,_,test_left1,_,_,_,_,_,_,_,_,_,_,_,_,_,_=self.left0_block.compute_test_points()
+                        _,_,_,test_left1,_,_,_=self.left0_block.compute_down_test_points()
                         self.img_cross=self.start_block.draw_additional_test_point(self.img_cross,test_left1,self.left0_block.centroid,cv2color=[0,255,0])
                         for block_test1 in blocks_list:
                             if block_test1.idx!=self.startIdx and block_test1.idx!=self.leftIdx[0]:  #to be sure
@@ -132,6 +154,9 @@ class Layer_group():
         o_move_right1=np.array([2*b_width,0.,0.])
         o_move_left0=np.array([-b_width,0.,0.])
         o_move_left1=np.array([-2*b_width,0.,0.])
+        o_move_down1=np.array([0,0,-2*b_height])
+        o_move_down1right0=np.array([b_width,0,-2*b_height])
+        o_move_down1left0=np.array([-b_width,0,-2*b_height])
 
         o_corner0=np.array([0.,0.,0.])
         o_corner1=np.array([0.,0.,b_height])
@@ -141,8 +166,8 @@ class Layer_group():
         #new frame
         self.target_T_o=target_T_o
         target_Rot_o=target_T_o[:3,:3]
-        target_quat_o=quaternion.from_rotation_matrix(target_Rot_o)
-        target_t_o=target_T_o[:3,3]
+        # target_quat_o=quaternion.from_rotation_matrix(target_Rot_o)
+        # target_t_o=target_T_o[:3,3]
 
         def homogeneus_T_product(hom_T,vector):
             hom_vector=np.zeros(4)
@@ -157,6 +182,9 @@ class Layer_group():
         self.target_move_right1=target_Rot_o@o_move_right1
         self.target_move_left0=target_Rot_o@o_move_left0
         self.target_move_left1=target_Rot_o@o_move_left1
+        self.target_move_down1=target_Rot_o@o_move_down1
+        self.target_move_down1right0=target_Rot_o@o_move_down1right0
+        self.target_move_down1left0=target_Rot_o@o_move_down1left0        
         self.target_RotVec_target=np.array([0.,0.,0.])
 
         #new target corners in new frame
@@ -247,6 +275,21 @@ class Layer_group():
             if len(ordered_corners)>0:
                 self.init_impt.append(ordered_corners)
                 self.init_objp.append(ordered_objp(self.target_move_left1))
+        if self.down1Idx!=-1 and self.down1_block.block_type=="front_face":
+            ordered_corners=self.down1_block.ordered_corners()
+            if len(ordered_corners)>0:
+                self.init_impt.append(ordered_corners)
+                self.init_objp.append(ordered_objp(self.target_move_down1))
+        if self.down1left0Idx!=-1 and self.down1left0_block.block_type=="front_face":
+            ordered_corners=self.down1left0_block.ordered_corners()
+            if len(ordered_corners)>0:
+                self.init_impt.append(ordered_corners)
+                self.init_objp.append(ordered_objp(self.target_move_down1left0))
+        if self.down1right0Idx!=-1 and self.down1right0_block.block_type=="front_face":
+            ordered_corners=self.down1right0_block.ordered_corners()
+            if len(ordered_corners)>0:
+                self.init_impt.append(ordered_corners)
+                self.init_objp.append(ordered_objp(self.target_move_down1right0))
 
         self.init_impt2=[]
         for impt_corners_list in self.init_impt:
