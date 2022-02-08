@@ -443,6 +443,17 @@ void tracking::learning_process()
 
       // Get and publish object pose
       cMo = tracker->getPose();
+
+      geometry_msgs::Pose forward_IK = move_group.getCurrentPose("edo_link_ee").pose;
+      bTee = visp_bridge::toVispHomogeneousMatrix(forward_IK); 
+      vpThetaUVector bTee_tu = bTee.getThetaUVector();
+
+      
+      vpThetaUVector cMo_tu = cMo.getThetaUVector();
+      cMo_tu[0] = -(M_PI_2-bTee_tu[1]); 
+      cMo_tu[2] = 0; 
+      cMo.insert(cMo_tu);
+
       //cTo = cMo;
       //q_unit << 0, 0, 0, 1;
       //cTo.insert(q_unit); //only for simulation
@@ -871,6 +882,15 @@ void tracking::detection_process()
 
       // Get and publish object pose
       cMo = tracker->getPose();
+      geometry_msgs::Pose forward_IK = move_group.getCurrentPose("edo_link_ee").pose;
+      bTee = visp_bridge::toVispHomogeneousMatrix(forward_IK); 
+      vpThetaUVector bTee_tu = bTee.getThetaUVector();
+
+      
+      vpThetaUVector cMo_tu = cMo.getThetaUVector();
+      cMo_tu[0] = -(M_PI_2-bTee_tu[1]); 
+      cMo_tu[2] = 0; 
+      cMo.insert(cMo_tu);
       //cTo = cMo;
       //q_unit << 0, 0, 0, 1;
       //cTo.insert(q_unit); //only for simulation
