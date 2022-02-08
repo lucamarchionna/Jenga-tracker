@@ -663,6 +663,31 @@ class Blocks_group():
             if len(ordered_corners)>0:
                 self.init_impt.append(ordered_corners)
                 self.init_objp.append(ordered_objp(self.target_move_left1))
+        if self.up1Idx!=-1 and self.up1_block.block_type=="front_face":
+            ordered_corners=self.up1_block.ordered_corners()
+            if len(ordered_corners)>0:
+                self.init_impt.append(ordered_corners)
+                self.init_objp.append(ordered_objp(self.target_move_up1))
+        if self.up1left0Idx!=-1 and self.up1left0_block.block_type=="front_face":
+            ordered_corners=self.up1left0_block.ordered_corners()
+            if len(ordered_corners)>0:
+                self.init_impt.append(ordered_corners)
+                self.init_objp.append(ordered_objp(self.target_move_up1left0))
+        if self.up1left1Idx!=-1 and self.up1left1_block.block_type=="front_face":
+            ordered_corners=self.up1left1Idx.ordered_corners()
+            if len(ordered_corners)>0:
+                self.init_impt.append(ordered_corners)
+                self.init_objp.append(ordered_objp(self.target_move_up1left1))       
+        if self.up1right0Idx!=-1 and self.up1right0_block.block_type=="front_face":
+            ordered_corners=self.up1right0_block.ordered_corners()
+            if len(ordered_corners)>0:
+                self.init_impt.append(ordered_corners)
+                self.init_objp.append(ordered_objp(self.target_move_up1right0))
+        if self.up1right1Idx!=-1 and self.up1right1_block.block_type=="front_face":
+            ordered_corners=self.up1right1_block.ordered_corners()
+            if len(ordered_corners)>0:
+                self.init_impt.append(ordered_corners)
+                self.init_objp.append(ordered_objp(self.target_move_up1right1))
 
         self.init_impt2=[]
         for impt_corners_list in self.init_impt:
