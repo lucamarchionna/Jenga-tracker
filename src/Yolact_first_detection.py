@@ -327,15 +327,16 @@ class First_layer_client():
       last_layer_number=18
 
       # From pose estimation to service request message
-      request = to_FirstLayerPoseRequest(False,True,rvec_last,tvec_last,"cx",last_layer_number)
+      request = to_FirstLayerPoseRequest(True,True,rvec_last,tvec_last,"cx",last_layer_number)
 
       return request
 
     if search_top:
       rospy.loginfo("Not full, top central layer")
+      return to_FirstLayerPoseRequest(False,False)
     elif search_bottom:
       rospy.loginfo("Not full, bottom central layer")
-    return to_FirstLayerPoseRequest(False,False)
+      return to_FirstLayerPoseRequest(True,False)      
 
 # %%
 if __name__ == "__main__":
