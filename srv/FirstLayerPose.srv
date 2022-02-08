@@ -1,4 +1,5 @@
-std_msgs/Bool found
-tracker_visp/ReferenceBlock cTlayer1
+std_msgs/Bool found_top
+std_msgs/Bool found_bottom
+tracker_visp/ReferenceBlock cTo
 ---
 std_msgs/Bool ready

@@ -5,17 +5,32 @@ from tracker_visp.srv import FirstLayerPose
 from tracker_visp.msg import ReferenceBlock
 from std_msgs.msg import Bool
 
+search_top=True
+search_bottom=False
+
 def service_handle(req):
+  global search_top
+  global search_bottom
   rospy.loginfo("Service called")
-  found=req.found
+  found_top=req.found_top.data
+  found_bottom=req.found_bottom.data
   cTlayer1=req.cTlayer1
-  print(found.data)
+  print(found_top)
+  print(found_bottom)
   print(cTlayer1)
   ready=Bool()
-  if found.data:
+  if search_top and found_top:
     ready.data=True 
-  else:
+    search_top=False
+    search_bottom=True
+    print("Found top, searching bottom")
+  elif search_bottom and found_bottom:
     ready.data=False
+    search_top=False
+    search_bottom=False
+    print("Found top and then bottom, Finish")
+  else:
+    ready.data=True
   return ready
 
 if __name__ == "__main__":
