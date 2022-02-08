@@ -165,7 +165,8 @@ class First_layer_client():
     # %%
     if len(masks)==0:
       rospy.loginfo("No blocks found")
-      return to_FirstLayerPoseRequest(False,False)
+      if search_bottom:
+        return to_FirstLayerPoseRequest(True,False,True)
 
     # %%
     totArea=0
@@ -206,7 +207,8 @@ class First_layer_client():
     ## Exit if less than 6 blocks found
     if len(blocks_list)<6:
       rospy.loginfo("Not enough blocks found, less than 6")
-      return to_FirstLayerPoseRequest(False,False)
+      if search_bottom:
+        return to_FirstLayerPoseRequest(True,False,True)      
     else:
       ## Sort blocks_list for centroid height
       blocks_list_ordered=sorted(blocks_list,key=Block.get_centroid_height)
