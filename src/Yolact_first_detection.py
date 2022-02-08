@@ -91,6 +91,7 @@ class First_layer_client():
 
     # Start streaming
     self.profile=self.pipeline.start(self.config)
+    rospy.sleep(1)
 
     #Squared images
     self.width=480
@@ -219,24 +220,24 @@ class First_layer_client():
       ## Group the top 3 blocks, draw their masks
       top3_masks=np.zeros(img.shape,dtype=np.uint8)
       top_groups=[]
-      for block in top3_blocks:
-        top3_masks+=block.draw_masked_approx(img)
+      # for block in top3_blocks:
+      #   top3_masks+=block.draw_masked_approx(img)
       for block in top3_blocks:
         if block.block_type=='front_face':
-          top_group=Layer_group(top3_blocks,block.idx,top3_masks)
-          top_group.init_up(top3_blocks)
+          top_group=Layer_group(top3_blocks,block.idx,img_all_masks)
+          top_group.init_up(blocks_list_ordered)
           # print("TOP center: ",top_group.is_central())
           top_groups.append(top_group)
       
       ## DONT Group the bottom 3 blocks, draw their masks
       bottom3_masks=np.zeros(img.shape,dtype=np.uint8)
       bottom_groups=[]
-      for block in bottom3_blocks:
-        bottom3_masks+=block.draw_masked_approx(img)
+      # for block in bottom3_blocks:
+      #   bottom3_masks+=block.draw_masked_approx(img)
       for block in bottom3_blocks:
         if block.block_type=='front_face':
-          bottom_group=Layer_group(bottom3_blocks,block.idx,bottom3_masks)
-          bottom_group.init_down(bottom3_blocks)
+          bottom_group=Layer_group(bottom3_blocks,block.idx,img_all_masks)
+          bottom_group.init_down(blocks_list_ordered)
           # print("Bottom center: ",bottom_group.is_central())
           bottom_groups.append(bottom_group)
       self.img_imshow=np.hstack((img_all_masks,top3_masks,bottom3_masks))
@@ -270,6 +271,8 @@ class First_layer_client():
     #Pose estimate of topmost, if top is still to be searched
     # CONTINUE only if top layer is full
     if top_central_numbers==1 and search_top:
+      first_layer.print_idx()
+      top3_masks=first_layer.draw_masked_group(img)
       first_layer.setup_object_frame(b_width,b_height,b_length,zend_T_o)
 
       rvec_first,tvec_first=first_layer.poseEstimate(width_offset,self.cam_mtx,self.cam_dist)
@@ -307,6 +310,8 @@ class First_layer_client():
       #   return to_FirstLayerPoseRequest(False,True,rvec_first,tvec_first,"cx",first_layer_number)
     
     elif bottom_central_numbers==1 and search_bottom:
+      last_layer.print_idx()      
+      bottom3_masks=last_layer.draw_masked_group(img)
       #Pose estimate of bottomost, if bottom is still to be searched and top is already searched
       # CONTINUE only if bottom layer is full
       last_layer.setup_object_frame(b_width,b_height,b_length,zend_T_o)
@@ -348,20 +353,23 @@ if __name__ == "__main__":
     # cycle until finding layer, after sending it
     while(not rospy.is_shutdown()):
       #wait for service
+      rospy.loginfo("Waiting for service")      
       rospy.wait_for_service('/FirstLayerPose')
       try:
         #Send to service, 
+        rospy.loginfo("Calling service")          
         motion_service = rospy.ServiceProxy('/FirstLayerPose', FirstLayerPose)
         resp = motion_service(request)
+        rospy.loginfo("Service called")                 
       except rospy.ServiceException as e:
-        rospy.loginfo("Service call failed: %s"%e)
+        rospy.loginfo("Service call failed: %s"%e)      
 
       # If motion not ready, ask the server again
       if not resp.ready:
         continue
 
       # If last time sent a found both=true, exit loop
-      if (request.found_top.data and request.found_bottom.data):
+      if (not search_top and not search_bottom):
         break
 
       # k=-1

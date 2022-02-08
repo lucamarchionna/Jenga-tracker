@@ -14,7 +14,7 @@ def service_handle(req):
   rospy.loginfo("Service called")
   found_top=req.found_top.data
   found_bottom=req.found_bottom.data
-  cTlayer1=req.cTlayer1
+  cTlayer1=req.cTo
   print(found_top)
   print(found_bottom)
   print(cTlayer1)
