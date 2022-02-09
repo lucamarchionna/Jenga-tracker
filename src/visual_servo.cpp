@@ -3,7 +3,7 @@
 
 using namespace std;
 
-visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh)
+visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh), s(vpFeatureTranslation::cMo), s_star(vpFeatureTranslation::cMo), s_tu(vpFeatureThetaU::cdRc)
 {
 
   client = node_handle.serviceClient<tracker_visp::YolactInitializeCaoPose>("/YolactInitializeCaoPose");
@@ -292,12 +292,12 @@ int visual_servoing::init_matrices()
   static const std::string PLANNING_GROUP = "edo";
   moveit::planning_interface::MoveGroupInterface move_group_interface(PLANNING_GROUP);
   moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
+  camTtarget = homogeneousTransformation("camera_color_optical_frame", "handeye_target2");
+  targetTcam = homogeneousTransformation("handeye_target2", "camera_color_optical_frame");
+  baseTtarget = homogeneousTransformation("edo_base_link", "handeye_target2");
+  eeTtarget = homogeneousTransformation("edo_gripper_link_ee", "handeye_target2");
   eeTcam = homogeneousTransformation("edo_gripper_link_ee", "camera_color_optical_frame");
-  camTtarget = homogeneousTransformation("camera_color_optical_frame", "handeye_target");
-  targetTcam = homogeneousTransformation("handeye_target", "camera_color_optical_frame");
   baseTee = homogeneousTransformation("edo_base_link", "edo_gripper_link_ee");
-  baseTtarget = homogeneousTransformation("edo_base_link", "handeye_target");
-  eeTtarget = homogeneousTransformation("edo_gripper_link_ee", "handeye_target");
   camTee=homogeneousTransformation("edo_gripper_link_ee", "camera_color_optical_frame"); 
   camTbase = homogeneousTransformation("camera_color_optical_frame", "edo_base_link");
 
@@ -536,6 +536,7 @@ void visual_servoing::learning_process()
     
     bool quit = false;
     static tf2_ros::TransformBroadcaster br;
+    static tf2_ros::StaticTransformBroadcaster br_static; 
     // Define camera's RF for girst initialization
     wTc = homogeneousTransformation("world", "camera_color_optical_frame");
     vpTranslationVector t1; t1 << 0.0,0, 0;
@@ -693,8 +694,13 @@ void visual_servoing::learning_process()
       vpDisplay::flush(I_depth_color);
 
       if (vpDisplay::getClick(I_color, button, false)) {
-        if (button == vpMouseButton::button3)
+        if (button == vpMouseButton::button3) {
           quit = true;
+          geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
+          br_static.sendTransform(pose_target2);
+          init_matrices();
+          init_servo();
+        }
         else if (button == vpMouseButton::button1)
           learn_position = true;
       }

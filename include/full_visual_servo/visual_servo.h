@@ -28,6 +28,7 @@
 #include "tracker_visp/YolactInitializeCaoPose.h"
 #include <tracker_visp/angle_velocity.h>
 #include <tf2_ros/transform_broadcaster.h>
+#include <tf2_ros/static_transform_broadcaster.h>
 #include <tf/transform_listener.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
