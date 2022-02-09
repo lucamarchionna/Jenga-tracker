@@ -238,18 +238,18 @@ add_dependencies(cpp_sendPic
 # )
 
 #tracker+pbvs
-# add_executable(visualServo
-#   src/visual_servo.cpp
-# )
+add_executable(visualServo
+  src/visual_servo.cpp
+)
 
-# target_link_libraries(visualServo
-#   ${catkin_LIBRARIES}
-#   ${VISP_LIBRARIES}
-#   ${realsense2_LIBRARY}
-#   ${PCL_LIBRARIES}
-# )
+target_link_libraries(visualServo
+  ${catkin_LIBRARIES}
+  ${VISP_LIBRARIES}
+  ${realsense2_LIBRARY}
+  ${PCL_LIBRARIES}
+)
 
-# add_dependencies(visualServo
-#   ${catkin_EXPORTED_TARGETS}
-#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
-# )
+add_dependencies(visualServo
+  ${catkin_EXPORTED_TARGETS}
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+)
