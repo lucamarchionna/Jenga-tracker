@@ -14,16 +14,25 @@ visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh), s(vpFea
   subLearning = node_handle.subscribe("/tracker_params/learning_phase", 1, &visual_servoing::learningCallback, this);
   // To wait a bit before publishing to /servo
   ros::Duration(1.0).sleep();
-  init_parameters();
-  learning_process();
+  init_startLoop();
+  ROS_INFO_STREAM("Start loop");
 
-  ROS_INFO_STREAM("Leaning process finished");
-  ros::Duration(1.0).sleep();
+  for(int i=0;i<3;i++){
+    init_shortLoop();
+    ROS_INFO_STREAM("Continue loop");    
 
-  detection_process();
+    learning_process();
 
-  
-  
+    ROS_INFO_STREAM("Learning process finished");
+    ros::Duration(1.0).sleep();
+
+    detection_process();
+    ROS_INFO_STREAM("Detection process finished");
+    ros::Duration(1.0).sleep();
+
+    delete tracker;
+    take_cTo=true;
+  }  
 }
 
 void visual_servoing::estimationCallback(const geometry_msgs::Pose& tracker_pose_P) 
@@ -176,13 +185,8 @@ void visual_servoing::learningCallback(const std_msgs::Bool::ConstPtr& msg)
 
 }
 
-void visual_servoing::init_parameters()
+void visual_servoing::init_startLoop()
 {
-  // Restore servo to starting position
-  tracker_visp::angle_velocity angleVel_to_servo;
-  angleVel_to_servo.angle = 90;	//degrees, setup angle
-  angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
-  servoPub.publish(angleVel_to_servo);
   //Settings  
   tracker_path = ros::package::getPath("tracker_visp");
   opt_config = tracker_path + "/trackers/jenga_tracker_params.xml";
@@ -237,11 +241,6 @@ void visual_servoing::init_parameters()
   _posx = 100; _posy = 50;
   d1.init(I_color, _posx, _posy, "Color stream");
   d2.init(I_depth_color, _posx, _posy + I_gray.getHeight()+10, "Depth stream");
-  ILearned.init(I_color.getHeight()*2,I_color.getWidth()*2);
-  // if (opt_learn)
-  d3.init(ILearned, _posx+I_color.getWidth()*2+10, _posy, "Learned-images");
-  //
-  
 
   // [Acquire stream and initialize displays]
   while (node_handle.ok()) {
@@ -266,14 +265,61 @@ void visual_servoing::init_parameters()
   trackerTypes.push_back(vpMbGenericTracker::EDGE_TRACKER | vpMbGenericTracker::KLT_TRACKER);
   trackerTypes.push_back(vpMbGenericTracker::DEPTH_DENSE_TRACKER);
 
+  //Task details
+  task.setServo(vpServo::EYEINHAND_CAMERA); //control law
+  task.setInteractionMatrixType(vpServo::CURRENT); //interaction matrix $\bf L$ is computed from the visual features at the desired position
+  
+  const vpAdaptiveGain lambda(1.4, 0.6, 30);
+  task.setLambda(lambda);
+
+  static const std::string PLANNING_GROUP = "edo";
+  moveit::planning_interface::MoveGroupInterface move_group_interface(PLANNING_GROUP);
+  moveit::planning_interface::PlanningSceneInterface planning_scene_interface;  
+
+  // Block axis?
+  error = 5;
+  threshold = 0.00002;
+  block_axis = false;
+  vitesse = 0.0002;
+  rapport = 0;  
+}
+
+void visual_servoing::init_shortLoop()
+{
+  // Restore servo to starting position
+  tracker_visp::angle_velocity angleVel_to_servo;
+  angleVel_to_servo.angle = 90;	//degrees, setup angle
+  angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
+  servoPub.publish(angleVel_to_servo);
+
+
+  // [Acquire stream and initialize displays]
+  while (node_handle.ok()) {
+    realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, NULL, NULL);
+
+    vpDisplay::display(I_color);
+    vpDisplay::displayText(I_color, 20, 20, "Click when ready.", vpColor::red);
+    vpDisplay::flush(I_color);
+    if (vpDisplay::getClick(I_color, false))
+      break;
+
+    vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
+    vpImageConvert::convert(I_depth_gray,I_depth_color);
+    vpDisplay::display(I_depth_color);
+    vpDisplay::displayText(I_depth_color, 20, 20, "Click when ready.", vpColor::red);
+    vpDisplay::flush(I_depth_color);
+    if (vpDisplay::getClick(I_depth_color, false))
+      break;
+  }
+
   tracker = new vpMbGenericTracker(trackerTypes);
   
   tracker->loadConfigFile(opt_config, opt_config);
   
   tracker->setCameraTransformationMatrix(mapOfCameraTransformations);
-  tracker->setCameraParameters(cam_color, cam_depth);
+  tracker->setCameraParameters(cam_color, cam_depth);  
 
-    // Display and error
+  // Display and error
   tracker->setDisplayFeatures(opt_display_features);
   tracker->setProjectionErrorComputation(true);
   tracker->setProjectionErrorDisplay(opt_display_projection_error);
@@ -289,9 +335,10 @@ void visual_servoing::init_parameters()
 
 int visual_servoing::init_matrices() 
 { 
-  static const std::string PLANNING_GROUP = "edo";
-  moveit::planning_interface::MoveGroupInterface move_group_interface(PLANNING_GROUP);
-  moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
+  geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
+  static tf2_ros::StaticTransformBroadcaster br_static;
+  br_static.sendTransform(pose_target2);
+
   camTtarget = homogeneousTransformation("camera_color_optical_frame", "handeye_target2");
   targetTcam = homogeneousTransformation("handeye_target2", "camera_color_optical_frame");
   baseTtarget = homogeneousTransformation("edo_base_link", "handeye_target2");
@@ -301,10 +348,10 @@ int visual_servoing::init_matrices()
   camTee=homogeneousTransformation("edo_gripper_link_ee", "camera_color_optical_frame"); 
   camTbase = homogeneousTransformation("camera_color_optical_frame", "edo_base_link");
 
-  vpTranslationVector t_off; t_off << 0.0, -0.0, -0.25;
-  vpRxyzVector rxyz; rxyz << 0, 0, -M_PI_2;
-  vpRotationMatrix R_off(rxyz);
-  offset.buildFrom(t_off, R_off.inverse());
+  // vpTranslationVector t_off; t_off << 0.0, -0.0, -0.25;
+  // vpRxyzVector rxyz; rxyz << 0, 0, -M_PI_2;
+  // vpRotationMatrix R_off(rxyz);
+  // offset.buildFrom(t_off, R_off.inverse());
   
   //base2target = baseTee*eeTtarget; 
   //initialGuestPos = insertPosData(base2target*offset);
@@ -363,13 +410,7 @@ int visual_servoing::init_matrices()
 
 void visual_servoing::init_servo()
 {
-  //Task details
-  task.setServo(vpServo::EYEINHAND_CAMERA); //control law
-  task.setInteractionMatrixType(vpServo::CURRENT); //interaction matrix $\bf L$ is computed from the visual features at the desired position
-  
-  const vpAdaptiveGain lambda(1.4, 0.6, 30);
-  task.setLambda(lambda);
-
+  //TODO:
   //s = new vpFeatureTranslation(vpFeatureTranslation::cMo); alternativa con puntatore
   //PBVS
   s.buildFrom(camTtarget);
@@ -391,6 +432,10 @@ void visual_servoing::init_servo()
 
 void visual_servoing::learning_process() 
 {
+   ILearned.init(I_color.getHeight()*2,I_color.getWidth()*2);
+  // if (opt_learn)
+  d3.init(ILearned, _posx+I_color.getWidth()*2+10, _posy, "Learned-images");
+  //
   
   // opt_learn = true;
   //opt_auto_init = false; // already in init_parameters()
@@ -536,7 +581,6 @@ void visual_servoing::learning_process()
     
     bool quit = false;
     static tf2_ros::TransformBroadcaster br;
-    static tf2_ros::StaticTransformBroadcaster br_static; 
     // Define camera's RF for girst initialization
     wTc = homogeneousTransformation("world", "camera_color_optical_frame");
     vpTranslationVector t1; t1 << 0.0,0, 0;
@@ -696,8 +740,6 @@ void visual_servoing::learning_process()
       if (vpDisplay::getClick(I_color, button, false)) {
         if (button == vpMouseButton::button3) {
           quit = true;
-          geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
-          br_static.sendTransform(pose_target2);
           init_matrices();
           init_servo();
         }
@@ -997,7 +1039,6 @@ void visual_servoing::detection_process()
 
       estimationCallback(cTo_P);
       
-
       // Check tracking errors
       double proj_error = tracker->getProjectionError();
       if (proj_error > opt_proj_error_threshold) {

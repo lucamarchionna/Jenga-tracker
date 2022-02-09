@@ -63,7 +63,8 @@ class visual_servoing
         void stopping_criteria();
         void update(const ros::TimerEvent& e);
         void estimationCallback(const geometry_msgs::Pose& tracker_pose_P);
-        void init_parameters();
+        void init_startLoop();
+        void init_shortLoop();
         void learning_process();
         void detection_process();
         void learningCallback(const std_msgs::Bool::ConstPtr& msg);
