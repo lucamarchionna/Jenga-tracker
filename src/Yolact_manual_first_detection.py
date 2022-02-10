@@ -254,6 +254,7 @@ class First_layer_client():
     # %%
     ## Find top central and bottom central groups
     # chosen_img=self.img_imshow.copy()
+
     rospy.loginfo("\nChoose first layer pressing 'c', exit pressing 'esc'\n")
     top_masks=first_layer.draw_masked_group(img)
     # img_test_points=top_group.get_drawn_search_img()
