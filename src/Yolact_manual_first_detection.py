@@ -244,44 +244,43 @@ class First_layer_client():
           bottom_group.init_up(blocks_list_ordered)
           # print("Bottom center: ",bottom_group.is_central())
           bottom_groups.append(bottom_group)
-      self.img_imshow=np.hstack((img_all_masks,top3_masks,bottom3_masks))
-    # %%
-    ## Find top central and bottom central groups
-    selected_group=False
-    # chosen_img=self.img_imshow.copy()
-    rospy.loginfo("\nChoose one group pressing 'c', pass pressing 'q', exit pressing 'esc'\n")
-    while(not selected_group and not rospy.is_shutdown()):
-      for top_group in top_groups:
-        masked_group=top_group.draw_masked_group(img)
-        # img_test_points=top_group.get_drawn_search_img()
-        self.img_imshow=np.hstack((img_all_masks,masked_group,bottom3_masks))
-        # self.img_imshow=np.hstack((img_test_points,masked_group))
-        # print("Cases:",random_block_group.caseA,random_block_group.caseB,random_block_group.caseC,random_block_group.caseD)
-        k=0 #to enter in the loop
-        # stay in the loop until q or c is pressed
-        while (k!=ord('q') and k!=ord('c') and k!=27 and not rospy.is_shutdown()):
-          cv2.imshow("q:discard,c:choose,esc:exit",self.img_imshow) #imshow in the main, on the concurrent image
-          k=cv2.waitKey(0) #red key in the image window
-          
-        ##
-        # exit if pressed 'esc'
-        ## WARNING: RETURN HERE ##
-        ##
-        if (k==27 and not selected_group):
-          rospy.loginfo("SERVICE HALTED BY USER")
-          # self.img_imshow=np.zeros((self.height,self.widht*3,3),dtype=np.uint8)
-          return to_FirstLayerPoseRequest(False,False)
-
-        if (k==ord('c') and not selected_group):
-          first_layer=top_group
-          selected_group=True
-          # chosen_img=self.img_imshow
+      # self.img_imshow=np.hstack((img,img_all_masks,top_masks))
 
     # top_central_numbers=0
-    # for top_group in top_groups:
-    #   if top_group.is_central():
-    #     first_layer=top_group
-    #     top_central_numbers+=1
+    for top_group in top_groups:
+      if top_group.is_central():
+        first_layer=top_group
+        # top_central_numbers+=1
+    # %%
+    ## Find top central and bottom central groups
+    # chosen_img=self.img_imshow.copy()
+
+    rospy.loginfo("\nChoose first layer pressing 'c', exit pressing 'esc'\n")
+    top_masks=first_layer.draw_masked_group(img)
+    # img_test_points=top_group.get_drawn_search_img()
+    self.img_imshow=np.hstack((img,img_all_masks,top_masks))
+    # self.img_imshow=np.hstack((img_test_points,masked_group))
+    # print("Cases:",random_block_group.caseA,random_block_group.caseB,random_block_group.caseC,random_block_group.caseD)
+    k=0 #to enter in the loop
+    # stay in the loop until q or c is pressed
+    while (k!=ord('c') and k!=27 and not rospy.is_shutdown()):
+      cv2.imshow("c:choose,esc:exit",self.img_imshow) #imshow in the main, on the concurrent image
+      k=cv2.waitKey(10) #red key in the image window
+      
+    ##
+    # exit if pressed 'esc'
+    ## WARNING: RETURN HERE ##
+    ##
+    if (k==27):
+      rospy.loginfo("SERVICE HALTED BY USER")
+      # self.img_imshow=np.zeros((self.height,self.widht*3,3),dtype=np.uint8)
+      return to_FirstLayerPoseRequest(False,False)
+
+    # if (k==ord('c')):
+    #   first_layer=top_group
+    #   selected_group=True
+      # chosen_img=self.img_imshow
+
     # bottom_central_numbers=0
     # for bottom_group in bottom_groups:
     #   if bottom_group.is_central():
@@ -306,8 +305,8 @@ class First_layer_client():
     # CONTINUE only if top layer is full
     # if top_central_numbers==1 and search_top:
     # if search_top:    
-    first_layer.print_idx()
-    top3_masks=first_layer.draw_masked_group(img)
+    # first_layer.print_idx()
+    # top3_masks=first_layer.draw_masked_group(img)
     first_layer.setup_object_frame(b_width,b_height,b_length,zend_T_o)
 
     rvec_first,tvec_first=first_layer.poseEstimate(width_offset,self.cam_mtx,self.cam_dist)
@@ -316,7 +315,7 @@ class First_layer_client():
     img_big=np.zeros((self.cam_height,self.cam_width,3),dtype=np.uint8)
     img_big[:,80:560]=img_all_masks.copy()
     img_big=cv2.drawFrameAxes(img_big,self.cam_mtx,self.cam_dist,rvec_first,tvec_first,0.03,thickness=3)
-    self.img_imshow=np.hstack((img_big[:,80:560],top3_masks,bottom3_masks))
+    self.img_imshow=np.hstack((img,img_big[:,80:560],top_masks))
 
     first_layer_number=18
 
@@ -386,7 +385,7 @@ if __name__ == "__main__":
 
   # cv2.namedWindow("top3,bottom3")
   cv2.namedWindow("Camera capture")
-  cv2.namedWindow("q:discard,c:choose,esc:exit")  
+  cv2.namedWindow("c:choose,esc:exit")  
   try:
     # cycle until finding layer, after sending it
     while(not rospy.is_shutdown()):

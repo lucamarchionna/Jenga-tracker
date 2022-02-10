@@ -227,7 +227,7 @@ class First_layer_client():
       for block in top3_blocks:
         if block.block_type=='front_face':
           top_group=Layer_group(top3_blocks,block.idx,img_all_masks)
-          top_group.init_up(blocks_list_ordered)
+          top_group.init_down(blocks_list_ordered)
           # print("TOP center: ",top_group.is_central())
           top_groups.append(top_group)
       
@@ -239,7 +239,7 @@ class First_layer_client():
       for block in bottom3_blocks:
         if block.block_type=='front_face':
           bottom_group=Layer_group(bottom3_blocks,block.idx,img_all_masks)
-          bottom_group.init_down(blocks_list_ordered)
+          bottom_group.init_up(blocks_list_ordered)
           # print("Bottom center: ",bottom_group.is_central())
           bottom_groups.append(bottom_group)
       self.img_imshow=np.hstack((img_all_masks,top3_masks,bottom3_masks))
@@ -273,7 +273,7 @@ class First_layer_client():
     #Pose estimate of topmost, if top is still to be searched
     # CONTINUE only if top layer is full
     if top_central_numbers==1 and search_top:
-      first_layer.print_idx()
+      # first_layer.print_idx()
       top3_masks=first_layer.draw_masked_group(img)
       first_layer.setup_object_frame(b_width,b_height,b_length,zend_T_o)
 
