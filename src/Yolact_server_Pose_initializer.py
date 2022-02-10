@@ -294,7 +294,7 @@ class Yolact_pose_service():
         return to_PoseEstimationResponse("")
       if (k==ord('c')):
         chosen_blocks_group=choice_group
-        cv2.imwrite(img_name[:-3]+'-'+str(time.time())+img_name[-4:],self.img_imshow) 
+        # cv2.imwrite(img_name[:-3]+'-'+str(time.time())+img_name[-4:],self.img_imshow) 
     # %%
     # selected_group=False
     # chosen_img=np.zeros((self.width,self.height*2,3),dtype=np.uint8)
@@ -362,7 +362,11 @@ class Yolact_pose_service():
     # %%
     initPose_file_name=os.path.join(self.rosPath,"model/file_init.pos")
     tvec,rvec=chosen_blocks_group.initPose_file_write(width_offset,initPose_file_name,cam_mtx,cam_dist)
-
+    #Draw frame axes on image
+    img_big=np.zeros((self.height,self.width,3),dtype=np.uint8)
+    img_big[:,80:560]=img_all_masks.copy()
+    img_big=cv2.drawFrameAxes(img_big,cam_mtx,cam_dist,rvec,tvec,0.04,thickness=2)
+    self.img_imshow=np.hstack((img_big[:,80:560],masked_group))
     # %%
     rospy.loginfo("---\nSUCCESFULLY ENDED\n---")
     return to_PoseEstimationResponse(cao_name,rvec,tvec,position,layer)
