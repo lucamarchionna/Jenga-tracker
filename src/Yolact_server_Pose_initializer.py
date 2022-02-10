@@ -147,6 +147,9 @@ class Yolact_pose_service():
     rvec_quat.z=req.cTo_est.pose.pose.orientation.z
     rvec_quat.w=req.cTo_est.pose.pose.orientation.w
     rvec_est=quaternion.as_rotation_vector(rvec_quat)
+    position=req.cTo_est.location.position
+    orientation=req.cTo_est.location.orientation
+    layer=req.cTo_est.location.layer
 
     color_image = np.frombuffer(msg_image.data, dtype=np.uint8).reshape(msg_image.height, msg_image.width, -1).copy()
     color_image=cv2.cvtColor(color_image,cv2.COLOR_RGB2BGR)
@@ -362,7 +365,7 @@ class Yolact_pose_service():
 
     # %%
     rospy.loginfo("---\nSUCCESFULLY ENDED\n---")
-    return to_PoseEstimationResponse(cao_name,rvec,tvec,"",0)
+    return to_PoseEstimationResponse(cao_name,rvec,tvec,position,layer)
 
 # %%
 if __name__ == "__main__":
