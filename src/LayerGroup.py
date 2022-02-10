@@ -168,10 +168,10 @@ class Layer_group():
         print("Index target: ",self.startIdx)
         print("Index right 0: ",self.rightIdx[0])
         print("Index left 0: ",self.leftIdx[0])
-        print("Index up: ",self.up1Idx)
+        print("Index up1: ",self.up1Idx)
         print("Index up1 right 0: ",self.up1right0Idx)
         print("Index up1 left 0: ",self.up1left0Idx)
-        print("Index down: ",self.down1Idx)
+        print("Index down1: ",self.down1Idx)
         print("Index down1 right 0: ",self.down1right0Idx)
         print("Index down1 left 0: ",self.down1left0Idx)
 
@@ -197,13 +197,13 @@ class Layer_group():
         if self.leftIdx[1]!=-1:
             self.masked_group+=self.left1_block.draw_masked_approx(img)                               
         if self.up1Idx!=-1 and self.up1_block.block_type=="front_face":
-            self.masked_group=self.start_block.draw_masked_approx(img)
+            self.masked_group+=self.up1_block.draw_masked_approx(img)
         if self.up1right0Idx!=-1 and self.up1right0_block.block_type=="front_face":
             self.masked_group+=self.up1right0_block.draw_masked_approx(img)
         if self.up1left0Idx!=-1 and self.up1left0_block.block_type=="front_face":
             self.masked_group+=self.up1left0_block.draw_masked_approx(img)
         if self.down1Idx!=-1 and self.down1_block.block_type=="front_face":
-            self.masked_group=self.start_block.draw_masked_approx(img)
+            self.masked_group+=self.down1_block.draw_masked_approx(img)
         if self.down1right0Idx!=-1 and self.down1right0_block.block_type=="front_face":
             self.masked_group+=self.down1right0_block.draw_masked_approx(img)
         if self.down1left0Idx!=-1 and self.down1left0_block.block_type=="front_face":
@@ -220,6 +220,12 @@ class Layer_group():
             self.masked_group=self.left0_block.draw_corners(self.masked_group)
         if self.leftIdx[1]!=-1:
             self.masked_group=self.left1_block.draw_corners(self.masked_group)
+        if self.down1Idx!=-1 and self.down1_block.block_type=="front_face":
+            self.masked_group=self.down1_block.draw_corners(self.masked_group)            
+        if self.down1left0Idx!=-1 and self.down1left0_block.block_type=="front_face":
+            self.masked_group=self.down1left0_block.draw_corners(self.masked_group)
+        if self.down1right0Idx!=-1 and self.down1right0_block.block_type=="front_face":
+            self.masked_group=self.down1right0_block.draw_corners(self.masked_group)
 
         return self.masked_group
 
