@@ -244,7 +244,7 @@ class First_layer_client():
           bottom_group.init_up(blocks_list_ordered)
           # print("Bottom center: ",bottom_group.is_central())
           bottom_groups.append(bottom_group)
-      self.img_imshow=np.hstack((img_all_masks,top3_masks,bottom3_masks))
+      # self.img_imshow=np.hstack((img,img_all_masks,top_masks))
 
     # top_central_numbers=0
     for top_group in top_groups:
@@ -257,14 +257,14 @@ class First_layer_client():
     rospy.loginfo("\nChoose first layer pressing 'c', exit pressing 'esc'\n")
     top_masks=first_layer.draw_masked_group(img)
     # img_test_points=top_group.get_drawn_search_img()
-    self.img_imshow=np.hstack((img_all_masks,top_masks,bottom3_masks))
+    self.img_imshow=np.hstack((img,img_all_masks,top_masks))
     # self.img_imshow=np.hstack((img_test_points,masked_group))
     # print("Cases:",random_block_group.caseA,random_block_group.caseB,random_block_group.caseC,random_block_group.caseD)
     k=0 #to enter in the loop
     # stay in the loop until q or c is pressed
     while (k!=ord('c') and k!=27 and not rospy.is_shutdown()):
       cv2.imshow("c:choose,esc:exit",self.img_imshow) #imshow in the main, on the concurrent image
-      k=cv2.waitKey(0) #red key in the image window
+      k=cv2.waitKey(10) #red key in the image window
       
     ##
     # exit if pressed 'esc'
@@ -314,7 +314,7 @@ class First_layer_client():
     img_big=np.zeros((self.cam_height,self.cam_width,3),dtype=np.uint8)
     img_big[:,80:560]=img_all_masks.copy()
     img_big=cv2.drawFrameAxes(img_big,self.cam_mtx,self.cam_dist,rvec_first,tvec_first,0.03,thickness=3)
-    self.img_imshow=np.hstack((img_big[:,80:560],top_masks,bottom3_masks))
+    self.img_imshow=np.hstack((img,img_big[:,80:560],top_masks))
 
     first_layer_number=18
 
