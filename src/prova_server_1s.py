@@ -36,6 +36,7 @@ def service_handle(req):
 if __name__ == "__main__":
   rospy.init_node('Ros_server_motion')
   s=rospy.Service('/FirstLayerPose',FirstLayerPose,service_handle)
+  rospy.loginfo("Start service, waiting...")
   try:
     rospy.spin()
   except KeyboardInterrupt:
