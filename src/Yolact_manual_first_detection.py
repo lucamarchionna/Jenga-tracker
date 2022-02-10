@@ -246,14 +246,20 @@ class First_layer_client():
           bottom_groups.append(bottom_group)
       # self.img_imshow=np.hstack((img,img_all_masks,top_masks))
 
+    find_central=False
     # top_central_numbers=0
     for top_group in top_groups:
       if top_group.is_central():
         first_layer=top_group
+        find_central=True
         # top_central_numbers+=1
+    
+    if not find_central:
+      return to_FirstLayerPoseRequest(False,False)
     # %%
     ## Find top central and bottom central groups
     # chosen_img=self.img_imshow.copy()
+
 
     rospy.loginfo("\nChoose first layer pressing 'c', exit pressing 'esc'\n")
     top_masks=first_layer.draw_masked_group(img)
