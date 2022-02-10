@@ -250,7 +250,7 @@ class First_layer_client():
     selected_group=False
     # chosen_img=self.img_imshow.copy()
     rospy.loginfo("\nChoose one group pressing 'c', pass pressing 'q', exit pressing 'esc'\n")
-    while(not selected_group):
+    while(not selected_group and not rospy.is_shutdown()):
       for top_group in top_groups:
         masked_group=top_group.draw_masked_group(img)
         # img_test_points=top_group.get_drawn_search_img()
