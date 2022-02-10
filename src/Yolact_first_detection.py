@@ -42,14 +42,14 @@ from layers.output_utils import postprocess
 def to_FirstLayerPoseRequest(found_top,found_bottom,search_bottom=False,rvec=None,tvec=None,position=None,layer=None):
   #From estimated pose to service message response
   found_top_msg=Bool()
-  found_top_msg.data=False
+  found_top_msg.data=search_bottom
   found_bottom_msg=Bool()
   found_bottom_msg.data=False  
   cTlayer1_msg=ReferenceBlock()
-  if (not search_bottom and found_top) or found_bottom:
+  if found_top or found_bottom:
     tvec=np.squeeze(tvec.copy())
     rvec=np.squeeze(rvec.copy())
-    found_top_msg.data=found_top
+    found_top_msg.data=True
     found_bottom_msg.data=found_bottom
     cTlayer1_msg.location.position=position
     if rvec[1]<0:	#radians, "right face seen from camera"
@@ -166,7 +166,7 @@ class First_layer_client():
     if len(masks)==0:
       rospy.loginfo("No blocks found")
       if search_bottom:
-        return to_FirstLayerPoseRequest(True,False,True)
+        return to_FirstLayerPoseRequest(False,False,search_bottom)
 
     # %%
     totArea=0
@@ -208,7 +208,7 @@ class First_layer_client():
     if len(blocks_list)<6:
       rospy.loginfo("Not enough blocks found, less than 6")
       if search_bottom:
-        return to_FirstLayerPoseRequest(True,False,True)      
+        return to_FirstLayerPoseRequest(False,False,search_bottom)      
     else:
       ## Sort blocks_list for centroid height
       blocks_list_ordered=sorted(blocks_list,key=Block.get_centroid_height)
@@ -338,7 +338,7 @@ class First_layer_client():
       return to_FirstLayerPoseRequest(False,False,False)
     elif search_bottom:
       rospy.loginfo("Not full, bottom central layer")
-      return to_FirstLayerPoseRequest(True,False,True)      
+      return to_FirstLayerPoseRequest(False,False,search_bottom)     
 
 # %%
 if __name__ == "__main__":

@@ -21,13 +21,14 @@ class Block():
             self.contours_all, _ = cv2.findContours(self.maskcv2,retr_list,chain_approx)
         except ValueError:
             _, self.contours_all, _ = cv2.findContours(self.maskcv2,retr_list,chain_approx)
-        self.contour_max=max(self.contours_all,key=cv2.contourArea)
-        self.area=cv2.contourArea(self.contour_max)
-        moments = cv2.moments(self.contour_max)
-        self.centroid=(int(moments['m10']/moments['m00']),int(moments['m01']/moments['m00']))
-        self.mask_single=np.zeros(self.maskcv2.shape,dtype=np.uint8)
-        #cv2.fillConvexPoly(self.mask_single,self.contour_max,255)
-        cv2.drawContours(self.mask_single,[self.contour_max],-1,255,thickness=-1)
+        if self.contours_all:
+            self.contour_max=max(self.contours_all,key=cv2.contourArea)
+            self.area=cv2.contourArea(self.contour_max)
+            moments = cv2.moments(self.contour_max)
+            self.centroid=(int(moments['m10']/moments['m00']),int(moments['m01']/moments['m00']))
+            self.mask_single=np.zeros(self.maskcv2.shape,dtype=np.uint8)
+            #cv2.fillConvexPoly(self.mask_single,self.contour_max,255)
+            cv2.drawContours(self.mask_single,[self.contour_max],-1,255,thickness=-1)
     
     def draw_contoursAll_centroid(self,img):
         temp=img.copy()

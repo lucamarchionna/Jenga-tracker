@@ -32,6 +32,10 @@
 #include <boost/bind.hpp>
 
 #include "tracker_visp/YolactInitializeCaoPose.h"
+#include "tracker_visp/ForceBasedDecision.h"
+#include "tracker_visp/location.h"
+#include "tracker_visp/ReferenceBlock.h"
+
 #include <tracker_visp/angle_velocity.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/static_transform_broadcaster.h>
@@ -71,9 +75,12 @@ class visual_servoing
         void estimationCallback(const geometry_msgs::Pose& tracker_pose_P);
         void init_parameters();
         void learning_process();
+        void reinit_vs();
         void detection_process();
         void learningCallback(const std_msgs::Bool::ConstPtr& msg);
         void forceCallback(const std_msgs::BoolConstPtr& retract_call);
+        double toBlocktransl(tracker_visp::location block);
+        
 
         vpHomogeneousMatrix homogeneousTransformation(string link1, string link2);
         geometry_msgs::TransformStamped toMoveit(vpHomogeneousMatrix data, string header, string child_frame);
@@ -96,7 +103,7 @@ class visual_servoing
         ros::Subscriber subLearning; 
         ros::Publisher trackerEstimation;
         ros::Publisher servoPub;
-        ros::ServiceClient client;
+        ros::ServiceClient client, client_force;
         string tracker_path, opt_config, opt_model, opt_init, opt_init_pos, opt_learning_data, opt_keypoint_config; 
 
         static const string PLANNING_GROUP; 
@@ -121,9 +128,12 @@ class visual_servoing
         vpRxyzVector rxyz(vpRotationMatrix);
         vpRotationMatrix R_off;
         vpTranslationVector trans_vec;
-        double translX;
+        double translX, translX_policy{0};
         double translY;
         double translZ;
+
+        tracker_visp::ForceBasedDecision srv_force;
+        tracker_visp::location block_choice, new_block;
 
         vpServo task;
         vpFeatureTranslation s;
@@ -148,7 +158,7 @@ class visual_servoing
         double threshold, threshold_pose{0.10};
         double vitesse;
         double rapport;
-        bool block_axis{false}, take_cTo{true}, retract{false};
+        bool block_axis{false}, take_cTo{true}, retract{false}, go_to_service{true};
         float signPoseReceived{1.0};
         vpColVector v_ee(unsigned int n), omega_ee(unsigned int n), v_cam, v(unsigned int n), e1, proj_e1;
 
@@ -160,7 +170,7 @@ class visual_servoing
         ros::Publisher pub, lastPose;
         double opt_learn, opt_auto_init, opt_proj_error_threshold{25.0}, opt_setGoodME_thresh{0.4};
         int opt_disp_visibility{0}, width{640}, height{480}, fps{30};
-        bool opt_display_projection_error{false}, opt_display_features{false}, opt_display_model{true}, opt_yolact_init{true}, opt_pose_init{true}, learn_position{true}, rotated{false};
+        bool opt_display_projection_error{false}, opt_display_features{false}, opt_display_model{true}, opt_yolact_init{true}, opt_pose_init{true}, learn_position{true}, rotated{false}, f_max{false}, run_completed{false};
         vpRotationMatrix cdRo;
         vpKeyPoint keypoint;
         vpMbGenericTracker *tracker;

@@ -49,6 +49,7 @@ add_service_files(
   FirstLayerPose.srv
   PoseEstimation.srv
   BlockEstimation.srv
+  ForceBasedDecision.srv
 )
 
 generate_messages(
