@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 
+from matplotlib.cbook import to_filehandle
 import rospy
 from tracker_visp.srv import FirstLayerPose
 from tracker_visp.srv import FirstLayerPoseRequest
@@ -9,6 +10,7 @@ from tracker_visp.msg import location
 from geometry_msgs.msg import Pose
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Bool
+from std_msgs.msg import String
 
 # %%
 import pyrealsense2 as rs
@@ -93,7 +95,7 @@ class First_layer_client():
 
     # Start streaming
     self.profile=self.pipeline.start(self.config)
-    rospy.sleep(1)
+    rospy.sleep(3)
 
     #Squared images
     self.width=480
@@ -150,8 +152,8 @@ class First_layer_client():
   # Big client function
   def first_layer_detection(self,color_image,search_top,search_bottom):
     # %%
-    img_name=os.path.join(self.yolact_path,"input_images",str(time.time())+".png")
-    cv2.imwrite(img_name,color_image)
+    # img_name=os.path.join(self.yolact_path,"input_images",str(time.time())+".png")
+    # cv2.imwrite(img_name,color_image)
 
     # %%
     ### CROP IMAGE TO BE SQUARE
@@ -167,8 +169,9 @@ class First_layer_client():
     # %%
     if len(masks)==0:
       rospy.loginfo("No blocks found")
-      if search_bottom:
-        return to_FirstLayerPoseRequest(True,False,True)
+      # if search_bottom:
+        # return to_FirstLayerPoseRequest(True,False,True)
+      return to_FirstLayerPoseRequest(False,False,False)
 
     # %%
     totArea=0
@@ -178,17 +181,26 @@ class First_layer_client():
       maskcv2=masks[idx].numpy().round().astype(np.uint8)*255
 
       block=Block(classes[idx],scores[idx],boxes[idx],masks[idx],len(blocks_list))
-      blocks_list.append(block)
 
       block.add_masked(img,maskcv2)
 
       #Find contours
-      block.find_contour(retr_list=cv2.RETR_LIST,chain_approx=cv2.CHAIN_APPROX_NONE)
+      ret=block.find_contour(retr_list=cv2.RETR_LIST,chain_approx=cv2.CHAIN_APPROX_NONE)
 
-      #Sum areas
-      totArea+=block.area
+      if ret:
+        blocks_list.append(block)
+        #Sum areas
+        totArea+=block.area
+      else:
+        print("Skipped empty contour")
 
-    avgArea=totArea/len(blocks_list)
+    if len(blocks_list)==0:
+      rospy.loginfo("No blocks contour computed")
+      # if search_bottom:
+        # return to_FirstLayerPoseRequest(True,False,True)
+      return to_FirstLayerPoseRequest(False,False,False)
+    else:
+      avgArea=totArea/len(blocks_list)
 
     # %%
     ## Approximate and find corners
@@ -204,13 +216,15 @@ class First_layer_client():
       img_all_masks+=block.draw_masked_approx(img)
 
     # %%
-    self.img_imshow=np.zeros((self.height,self.width*3,3),dtype=np.uint8)
+    # self.img_imshow=np.zeros((self.height,self.width*3,3),dtype=np.uint8)
+    self.img_imshow=np.hstack((img,img_all_masks,np.zeros((self.height,self.width,3),dtype=np.uint8)))    
 
     ## Exit if less than 6 blocks found
     if len(blocks_list)<6:
       rospy.loginfo("Not enough blocks found, less than 6")
-      if search_bottom:
-        return to_FirstLayerPoseRequest(True,False,True)      
+      # if search_bottom:
+      #   return to_FirstLayerPoseRequest(True,False,True)     
+      return to_FirstLayerPoseRequest(False,False)   
     else:
       ## Sort blocks_list for centroid height
       blocks_list_ordered=sorted(blocks_list,key=Block.get_centroid_height)
@@ -224,8 +238,8 @@ class First_layer_client():
       ## Group the top 3 blocks, draw their masks
       top3_masks=np.zeros(img.shape,dtype=np.uint8)
       top_groups=[]
-      # for block in top3_blocks:
-      #   top3_masks+=block.draw_masked_approx(img)
+      for block in top3_blocks:
+        top3_masks+=block.draw_masked_approx(img)
       for block in top3_blocks:
         if block.block_type=='front_face':
           top_group=Layer_group(top3_blocks,block.idx,img_all_masks)
@@ -244,7 +258,8 @@ class First_layer_client():
           bottom_group.init_up(blocks_list_ordered)
           # print("Bottom center: ",bottom_group.is_central())
           bottom_groups.append(bottom_group)
-      # self.img_imshow=np.hstack((img,img_all_masks,top_masks))
+
+      self.img_imshow=np.hstack((img,img_all_masks,top3_masks))
 
     find_central=False
     # top_central_numbers=0
@@ -252,8 +267,9 @@ class First_layer_client():
       if top_group.is_central():
         first_layer=top_group
         find_central=True
+        print(top_group.is_central())
         # top_central_numbers+=1
-    
+
     if not find_central:
       return to_FirstLayerPoseRequest(False,False)
     # %%
@@ -267,25 +283,6 @@ class First_layer_client():
     self.img_imshow=np.hstack((img,img_all_masks,top_masks))
     # self.img_imshow=np.hstack((img_test_points,masked_group))
     # print("Cases:",random_block_group.caseA,random_block_group.caseB,random_block_group.caseC,random_block_group.caseD)
-    k=0 #to enter in the loop
-    # stay in the loop until q or c is pressed
-    while (k!=ord('c') and k!=27 and not rospy.is_shutdown()):
-      cv2.imshow("c:choose,esc:exit",self.img_imshow) #imshow in the main, on the concurrent image
-      k=cv2.waitKey(10) #red key in the image window
-      
-    ##
-    # exit if pressed 'esc'
-    ## WARNING: RETURN HERE ##
-    ##
-    if (k==27):
-      rospy.loginfo("SERVICE HALTED BY USER")
-      # self.img_imshow=np.zeros((self.height,self.widht*3,3),dtype=np.uint8)
-      return to_FirstLayerPoseRequest(False,False)
-
-    # if (k==ord('c')):
-    #   first_layer=top_group
-    #   selected_group=True
-      # chosen_img=self.img_imshow
 
     # bottom_central_numbers=0
     # for bottom_group in bottom_groups:
@@ -324,6 +321,7 @@ class First_layer_client():
     self.img_imshow=np.hstack((img,img_big[:,80:560],top_masks))
 
     first_layer_number=18
+    # first_layer_number=4
 
     # From pose estimation to service request message
     # request = to_FirstLayerPoseRequest(True,False,False,rvec_first,tvec_first,"cx",first_layer_number)
@@ -383,6 +381,7 @@ class First_layer_client():
 if __name__ == "__main__":
   rospy.init_node('First_layer_service')
   # client=rospy.client('First_layer_detection',FirstLayerPose)
+  first_layer_orient = rospy.Publisher('/init_orientation', String, queue_size=1)   
   yolact_object=First_layer_client()
   
   request=to_FirstLayerPoseRequest(False,False)
@@ -413,6 +412,8 @@ if __name__ == "__main__":
 
       # If last time sent a found both=true, exit loop
       if (not search_top and not search_bottom):
+        print("Found orient: ",request.cTo.location.orientation)
+        first_layer_orient.publish(request.cTo.location.orientation)
         break
 
       # k=-1
@@ -442,13 +443,32 @@ if __name__ == "__main__":
           search_top=False
           # search_bottom=True
           search_bottom=False
-      # elif search_bottom:
+      # elif search_bottom:""
       #   request = yolact_object.first_layer_detection(color_image,search_top,search_bottom)
       #   # keep searching if not found bottom layer
       #   if request.found_bottom.data:
       #     search_top=False
       #     search_bottom=False
 
+      k=0 #to enter in the loop
+      # stay in the loop until q or c is pressed
+      while (k!=ord('c') and k!=27 and not rospy.is_shutdown()):
+        cv2.imshow("c:choose,esc:exit",yolact_object.img_imshow) #imshow in the main, on the concurrent image
+        k=cv2.waitKey(100) #red key in the image window
+      else:
+        if (k==27):          
+          # repeat if pressed 'esc'
+          rospy.loginfo("SERVICE HALTED BY USER")
+          # self.img_imshow=np.zeros((self.height,self.widht*3,3),dtype=np.uint8)
+          search_top=True
+          # search_bottom=True
+          search_bottom=False        
+          request=to_FirstLayerPoseRequest(False,False)
+
+    # if (k==ord('c')):
+    #   first_layer=top_group
+    #   selected_group=True
+      # chosen_img=self.img_imshow
       # cv2.imshow("top3,bottom3",yolact_object.img_imshow) #imshow in the main, on the concurrent image
       # # k=-1
       # # while(k==-1 and not rospy.is_shutdown()):

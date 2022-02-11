@@ -891,7 +891,15 @@ void visual_servoing::detection_process()
   opt_learn = false;
   opt_auto_init = true; 
   opt_yolact_init = false;
-  keypoint.loadLearningData(opt_learning_data, true);
+
+    if (vpIoTools::checkFilename(opt_learning_data)){
+    keypoint.loadLearningData(opt_learning_data, true);
+  }
+  else {
+    ROS_ERROR("Could not find learning file");
+    return;
+  }
+
   vpImageConvert::convert(I_color,I_gray);
   keypoint.createImageMatching(I_gray, IMatching);
   d3.setDownScalingFactor(vpDisplay::SCALE_AUTO);

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from pickletools import uint8
 import rospy
 from tracker_visp.srv import *
 from tracker_visp.msg import *
@@ -165,6 +166,7 @@ class Yolact_pose_service():
     hhh,www,_=color_image.shape
     width_offset=int(www-hhh)/2
     img=color_image[int(hhh/2)-240:int(hhh/2)+240,int(www/2)-240:int(www/2)+240]
+    self.img_imshow=np.hstack((img,np.zeros(img.shape,dtype=np.uint8)))
 
     # %%
     # Detection
@@ -363,10 +365,10 @@ class Yolact_pose_service():
     initPose_file_name=os.path.join(self.rosPath,"model/file_init.pos")
     tvec,rvec=chosen_blocks_group.initPose_file_write(width_offset,initPose_file_name,cam_mtx,cam_dist)
     #Draw frame axes on image
-    img_big=np.zeros((self.height,self.width,3),dtype=np.uint8)
-    img_big[:,80:560]=img_all_masks.copy()
+    img_big=np.zeros(color_image.shape,dtype=np.uint8)
+    img_big[:,80:560]=masked_group.copy()
     img_big=cv2.drawFrameAxes(img_big,cam_mtx,cam_dist,rvec,tvec,0.04,thickness=2)
-    self.img_imshow=np.hstack((img_big[:,80:560],masked_group))
+    self.img_imshow=np.hstack((img_all_masks,img_big[:,80:560]))
     # %%
     rospy.loginfo("---\nSUCCESFULLY ENDED\n---")
     return to_PoseEstimationResponse(cao_name,rvec,tvec,position,layer)
