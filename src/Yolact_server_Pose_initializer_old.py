@@ -107,7 +107,7 @@ class Yolact_pose_service():
     self.net.load_weights(self.weights_path)
     self.net.eval()
 
-    self.s=rospy.Service('YolactInitializeCaoPose',YolactInitializeCaoPose,self.pose_service_handle)
+    self.s=rospy.Service('/YolactInitializeCaoPose',YolactInitializeCaoPose,self.pose_service_handle)
 
   # %%
   def compute_outputs(self, img, score_threshold):

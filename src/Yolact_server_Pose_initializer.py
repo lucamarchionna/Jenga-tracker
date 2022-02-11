@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from pickletools import uint8
 import rospy
 from tracker_visp.srv import *
 from tracker_visp.msg import *
@@ -147,6 +148,9 @@ class Yolact_pose_service():
     rvec_quat.z=req.cTo_est.pose.pose.orientation.z
     rvec_quat.w=req.cTo_est.pose.pose.orientation.w
     rvec_est=quaternion.as_rotation_vector(rvec_quat)
+    position=req.cTo_est.location.position
+    orientation=req.cTo_est.location.orientation
+    layer=req.cTo_est.location.layer
 
     color_image = np.frombuffer(msg_image.data, dtype=np.uint8).reshape(msg_image.height, msg_image.width, -1).copy()
     color_image=cv2.cvtColor(color_image,cv2.COLOR_RGB2BGR)
@@ -162,6 +166,7 @@ class Yolact_pose_service():
     hhh,www,_=color_image.shape
     width_offset=int(www-hhh)/2
     img=color_image[int(hhh/2)-240:int(hhh/2)+240,int(www/2)-240:int(www/2)+240]
+    self.img_imshow=np.hstack((img,np.zeros(img.shape,dtype=np.uint8)))
 
     # %%
     # Detection
@@ -291,7 +296,7 @@ class Yolact_pose_service():
         return to_PoseEstimationResponse("")
       if (k==ord('c')):
         chosen_blocks_group=choice_group
-        cv2.imwrite(img_name[:-3]+'-'+str(time.time())+img_name[-4:],self.img_imshow) 
+        # cv2.imwrite(img_name[:-3]+'-'+str(time.time())+img_name[-4:],self.img_imshow) 
     # %%
     # selected_group=False
     # chosen_img=np.zeros((self.width,self.height*2,3),dtype=np.uint8)
@@ -359,10 +364,14 @@ class Yolact_pose_service():
     # %%
     initPose_file_name=os.path.join(self.rosPath,"model/file_init.pos")
     tvec,rvec=chosen_blocks_group.initPose_file_write(width_offset,initPose_file_name,cam_mtx,cam_dist)
-
+    #Draw frame axes on image
+    img_big=np.zeros(color_image.shape,dtype=np.uint8)
+    img_big[:,80:560]=masked_group.copy()
+    img_big=cv2.drawFrameAxes(img_big,cam_mtx,cam_dist,rvec,tvec,0.04,thickness=2)
+    self.img_imshow=np.hstack((img_all_masks,img_big[:,80:560]))
     # %%
     rospy.loginfo("---\nSUCCESFULLY ENDED\n---")
-    return to_PoseEstimationResponse(cao_name,rvec,tvec,"",0)
+    return to_PoseEstimationResponse(cao_name,rvec,tvec,position,layer)
 
 # %%
 if __name__ == "__main__":

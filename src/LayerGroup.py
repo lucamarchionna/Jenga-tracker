@@ -11,8 +11,20 @@ class Layer_group():
 
     def __init__(self,blocks_list,startIdx,img):
         self.startIdx=startIdx
+        self.upIdx=-1
+        self.downIdx=-1
         self.rightIdx=[-1,-1]
         self.leftIdx=[-1,-1]
+        self.up1Idx=-1
+        self.up1left0Idx=-1
+        self.up1right0Idx=-1
+        self.up1left1Idx=-1
+        self.up1right1Idx=-1
+        self.down1Idx=-1
+        self.down1left0Idx=-1
+        self.down1right0Idx=-1
+        self.down1left1Idx=-1
+        self.down1right1Idx=-1        
 
         self.img_cross=img.copy()
 
@@ -37,6 +49,8 @@ class Layer_group():
             print("Not a front face block")
             return
             
+    def init_down(self,blocks_list):
+
         test_down,test_right0,test_right1,test_left0,test_left1,\
             test_down1,test_down1left0,test_down1right0=self.start_block.compute_down_test_points()
         self.img_cross=self.start_block.draw_layer_test_points(self.img_cross)
@@ -45,50 +59,105 @@ class Layer_group():
         #only first found, mutually exclusive
         for block_test in blocks_list:
             if block_test.idx!=self.startIdx:
-                #Test down
-                if self.downIdx==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_down,False)==1):
-                    self.downIdx=block_test.idx
-                    self.down_block=block_test
-                #Test down1
-                if self.down1Idx==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_down1,False)==1):
-                    self.down1Idx=block_test.idx
-                    self.down1_block=block_test
-                #Test down1left0
-                if  self.down1left0Idx==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_down1left0,False)==1):
-                    self.down1left0Idx=block_test.idx
-                    self.down1left0_block=block_test
-                #Test down1right0
-                if self.down1right0Idx==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_down1right0,False)==1):
-                    self.down1right0Idx=block_test.idx
-                    self.down1right0_block=block_test
+                # #Test down
+                # if self.downIdx==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_down,False)==1):
+                #     self.downIdx=block_test.idx
+                #     self.down_block=block_test
                 #Test right0
                 if self.rightIdx[0]==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_right0,False)==1):
                     self.rightIdx[0]=block_test.idx
                     self.right0_block=block_test
-                    #Then test right1
-                    #only if right0 is front
-                    if self.right0_block.block_type=='front_face':
-                        _,test_right1,_,_,_,_,_=self.right0_block.compute_down_test_points()
-                        self.img_cross=self.start_block.draw_additional_test_point(self.img_cross,test_right1,self.right0_block.centroid,cv2color=[0,0,255])
-                        for block_test1 in blocks_list:
-                            if block_test1.idx!=self.startIdx and block_test1.idx!=self.rightIdx[0]:  #to be sure
-                                if self.rightIdx[1]==-1 and (cv2.pointPolygonTest(block_test1.contour_max,test_right1,False)==1):
-                                    self.rightIdx[1]=block_test1.idx
-                                    self.right1_block=block_test1
+                    # #Then test right1
+                    # #only if right0 is front
+                    # if self.right0_block.block_type=='front_face':
+                    #     _,test_right1,_,_,_,_,_,_=self.right0_block.compute_down_test_points()
+                    #     self.img_cross=self.start_block.draw_additional_test_point(self.img_cross,test_right1,self.right0_block.centroid,cv2color=[0,0,255])
+                    #     for block_test1 in blocks_list:
+                    #         if block_test1.idx!=self.startIdx and block_test1.idx!=self.rightIdx[0]:  #to be sure
+                    #             if self.rightIdx[1]==-1 and (cv2.pointPolygonTest(block_test1.contour_max,test_right1,False)==1):
+                    #                 self.rightIdx[1]=block_test1.idx
+                    #                 self.right1_block=block_test1
                 #Test left0
                 elif self.leftIdx[0]==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_left0,False)==1):
                     self.leftIdx[0]=block_test.idx
                     self.left0_block=block_test
-                    #Then test left1
-                    #only if left0 is front
-                    if self.left0_block.block_type=='front_face':
-                        _,_,_,test_left1,_,_,_=self.left0_block.compute_down_test_points()
-                        self.img_cross=self.start_block.draw_additional_test_point(self.img_cross,test_left1,self.left0_block.centroid,cv2color=[0,255,0])
-                        for block_test1 in blocks_list:
-                            if block_test1.idx!=self.startIdx and block_test1.idx!=self.leftIdx[0]:  #to be sure
-                                if self.leftIdx[1]==-1 and (cv2.pointPolygonTest(block_test1.contour_max,test_left1,False)==1):
-                                    self.leftIdx[1]=block_test1.idx
-                                    self.left1_block=block_test1
+                    # #Then test left1
+                    # #only if left0 is front
+                    # if self.left0_block.block_type=='front_face':
+                    #     _,_,_,test_left1,_,_,_,_=self.left0_block.compute_down_test_points()
+                    #     self.img_cross=self.start_block.draw_additional_test_point(self.img_cross,test_left1,self.left0_block.centroid,cv2color=[0,255,0])
+                    #     for block_test1 in blocks_list:
+                    #         if block_test1.idx!=self.startIdx and block_test1.idx!=self.leftIdx[0]:  #to be sure
+                    #             if self.leftIdx[1]==-1 and (cv2.pointPolygonTest(block_test1.contour_max,test_left1,False)==1):
+                    #                 self.leftIdx[1]=block_test1.idx
+                    #                 self.left1_block=block_test1                
+                #Test down1
+                elif self.down1Idx==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_down1,False)==1):
+                    self.down1Idx=block_test.idx
+                    self.down1_block=block_test
+                #Test down1left0
+                elif  self.down1left0Idx==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_down1left0,False)==1):
+                    self.down1left0Idx=block_test.idx
+                    self.down1left0_block=block_test
+                #Test down1right0
+                elif self.down1right0Idx==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_down1right0,False)==1):
+                    self.down1right0Idx=block_test.idx
+                    self.down1right0_block=block_test
+
+    def init_up(self,blocks_list):
+
+        test_up,test_right0,test_right1,test_left0,test_left1,\
+            test_up1,test_up1left0,test_up1right0=self.start_block.compute_up_test_points()
+        self.img_cross=self.start_block.draw_layer_test_points(self.img_cross)
+
+        #TEST Right left
+        #only first found, mutually exclusive
+        for block_test in blocks_list:
+            if block_test.idx!=self.startIdx:
+                # #Test up
+                # if self.upIdx==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_up,False)==1):
+                #     self.upIdx=block_test.idx
+                #     self.up_block=block_test
+                #Test right0
+                if self.rightIdx[0]==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_right0,False)==1):
+                    self.rightIdx[0]=block_test.idx
+                    self.right0_block=block_test
+                    # #Then test right1
+                    # #only if right0 is front
+                    # if self.right0_block.block_type=='front_face':
+                    #     _,test_right1,_,_,_,_,_,_=self.right0_block.compute_up_test_points()
+                    #     self.img_cross=self.start_block.draw_additional_test_point(self.img_cross,test_right1,self.right0_block.centroid,cv2color=[0,0,255])
+                    #     for block_test1 in blocks_list:
+                    #         if block_test1.idx!=self.startIdx and block_test1.idx!=self.rightIdx[0]:  #to be sure
+                    #             if self.rightIdx[1]==-1 and (cv2.pointPolygonTest(block_test1.contour_max,test_right1,False)==1):
+                    #                 self.rightIdx[1]=block_test1.idx
+                    #                 self.right1_block=block_test1
+                #Test left0
+                elif self.leftIdx[0]==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_left0,False)==1):
+                    self.leftIdx[0]=block_test.idx
+                    self.left0_block=block_test
+                    # #Then test left1
+                    # #only if left0 is front
+                    # if self.left0_block.block_type=='front_face':
+                    #     _,_,_,test_left1,_,_,_,_=self.left0_block.compute_up_test_points()
+                    #     self.img_cross=self.start_block.draw_additional_test_point(self.img_cross,test_left1,self.left0_block.centroid,cv2color=[0,255,0])
+                    #     for block_test1 in blocks_list:
+                    #         if block_test1.idx!=self.startIdx and block_test1.idx!=self.leftIdx[0]:  #to be sure
+                    #             if self.leftIdx[1]==-1 and (cv2.pointPolygonTest(block_test1.contour_max,test_left1,False)==1):
+                    #                 self.leftIdx[1]=block_test1.idx
+                    #                 self.left1_block=block_test1                    
+                #Test up1
+                elif self.up1Idx==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_up1,False)==1):
+                    self.up1Idx=block_test.idx
+                    self.up1_block=block_test
+                #Test up1left0
+                elif  self.up1left0Idx==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_up1left0,False)==1):
+                    self.up1left0Idx=block_test.idx
+                    self.up1left0_block=block_test
+                #Test up1right0
+                elif self.up1right0Idx==-1 and (cv2.pointPolygonTest(block_test.contour_max,test_up1right0,False)==1):
+                    self.up1right0Idx=block_test.idx
+                    self.up1right0_block=block_test
     
     def is_central(self):
         #block at center of horizontal
@@ -98,9 +167,13 @@ class Layer_group():
         #Print indices
         print("Index target: ",self.startIdx)
         print("Index right 0: ",self.rightIdx[0])
-        print("Index right 1: ",self.rightIdx[1])
         print("Index left 0: ",self.leftIdx[0])
-        print("Index left 1: ",self.leftIdx[1])
+        print("Index up1: ",self.up1Idx)
+        print("Index up1 right 0: ",self.up1right0Idx)
+        print("Index up1 left 0: ",self.up1left0Idx)
+        print("Index down1: ",self.down1Idx)
+        print("Index down1 right 0: ",self.down1right0Idx)
+        print("Index down1 left 0: ",self.down1left0Idx)
 
     def get_drawn_search_img(self):
         return self.img_cross.copy()
@@ -123,6 +196,18 @@ class Layer_group():
             self.masked_group+=self.left0_block.draw_masked_approx(img)
         if self.leftIdx[1]!=-1:
             self.masked_group+=self.left1_block.draw_masked_approx(img)                               
+        if self.up1Idx!=-1 and self.up1_block.block_type=="front_face":
+            self.masked_group+=self.up1_block.draw_masked_approx(img)
+        if self.up1right0Idx!=-1 and self.up1right0_block.block_type=="front_face":
+            self.masked_group+=self.up1right0_block.draw_masked_approx(img)
+        if self.up1left0Idx!=-1 and self.up1left0_block.block_type=="front_face":
+            self.masked_group+=self.up1left0_block.draw_masked_approx(img)
+        if self.down1Idx!=-1 and self.down1_block.block_type=="front_face":
+            self.masked_group+=self.down1_block.draw_masked_approx(img)
+        if self.down1right0Idx!=-1 and self.down1right0_block.block_type=="front_face":
+            self.masked_group+=self.down1right0_block.draw_masked_approx(img)
+        if self.down1left0Idx!=-1 and self.down1left0_block.block_type=="front_face":
+            self.masked_group+=self.down1left0_block.draw_masked_approx(img)            
 
         if self.startIdx!=-1:
             self.masked_group=self.start_block.draw_corners(self.masked_group)
@@ -135,6 +220,12 @@ class Layer_group():
             self.masked_group=self.left0_block.draw_corners(self.masked_group)
         if self.leftIdx[1]!=-1:
             self.masked_group=self.left1_block.draw_corners(self.masked_group)
+        if self.down1Idx!=-1 and self.down1_block.block_type=="front_face":
+            self.masked_group=self.down1_block.draw_corners(self.masked_group)            
+        if self.down1left0Idx!=-1 and self.down1left0_block.block_type=="front_face":
+            self.masked_group=self.down1left0_block.draw_corners(self.masked_group)
+        if self.down1right0Idx!=-1 and self.down1right0_block.block_type=="front_face":
+            self.masked_group=self.down1right0_block.draw_corners(self.masked_group)
 
         return self.masked_group
 
@@ -157,6 +248,9 @@ class Layer_group():
         o_move_down1=np.array([0,0,-2*b_height])
         o_move_down1right0=np.array([b_width,0,-2*b_height])
         o_move_down1left0=np.array([-b_width,0,-2*b_height])
+        o_move_up1=np.array([0,0,2*b_height])
+        o_move_up1right0=np.array([b_width,0,2*b_height])
+        o_move_up1left0=np.array([-b_width,0,2*b_height])        
 
         o_corner0=np.array([0.,0.,0.])
         o_corner1=np.array([0.,0.,b_height])
@@ -185,7 +279,9 @@ class Layer_group():
         self.target_move_down1=target_Rot_o@o_move_down1
         self.target_move_down1right0=target_Rot_o@o_move_down1right0
         self.target_move_down1left0=target_Rot_o@o_move_down1left0        
-        self.target_RotVec_target=np.array([0.,0.,0.])
+        self.target_move_up1=target_Rot_o@o_move_up1
+        self.target_move_up1right0=target_Rot_o@o_move_up1right0
+        self.target_move_up1left0=target_Rot_o@o_move_up1left0     
 
         #new target corners in new frame
         self.target_corner0=homogeneus_T_product(self.target_T_o,o_corner0)
@@ -290,6 +386,21 @@ class Layer_group():
             if len(ordered_corners)>0:
                 self.init_impt.append(ordered_corners)
                 self.init_objp.append(ordered_objp(self.target_move_down1right0))
+        if self.up1Idx!=-1 and self.up1_block.block_type=="front_face":
+            ordered_corners=self.up1_block.ordered_corners()
+            if len(ordered_corners)>0:
+                self.init_impt.append(ordered_corners)
+                self.init_objp.append(ordered_objp(self.target_move_up1))
+        if self.up1left0Idx!=-1 and self.up1left0_block.block_type=="front_face":
+            ordered_corners=self.up1left0_block.ordered_corners()
+            if len(ordered_corners)>0:
+                self.init_impt.append(ordered_corners)
+                self.init_objp.append(ordered_objp(self.target_move_up1left0))
+        if self.up1right0Idx!=-1 and self.up1right0_block.block_type=="front_face":
+            ordered_corners=self.up1right0_block.ordered_corners()
+            if len(ordered_corners)>0:
+                self.init_impt.append(ordered_corners)
+                self.init_objp.append(ordered_objp(self.target_move_up1right0))                
 
         self.init_impt2=[]
         for impt_corners_list in self.init_impt:
