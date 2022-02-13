@@ -17,6 +17,12 @@
 #include <visp3/vs/vpServo.h>
 #include <visp3/core/vpVelocityTwistMatrix.h>
 
+// TEMP
+#include <visp3/io/vpVideoWriter.h>
+#include <visp3/core/vpImageDraw.h>
+#include <visp3/core/vpFont.h>
+// TEMP
+
 #include "tf2_msgs/TFMessage.h"
 #include <geometry_msgs/TransformStamped.h>
 #include <geometry_msgs/Transform.h>
@@ -67,8 +73,7 @@ class visual_servoing
         void stopping_criteria();
         void update(const ros::TimerEvent& e);
         void estimationCallback(const geometry_msgs::Pose& tracker_pose_P);
-        void init_startLoop();
-        void init_shortLoop();
+        void init_parameters();
         void learning_process();
         void reinit_vs();
         void detection_process();
@@ -171,6 +176,8 @@ class visual_servoing
         vpKeyPoint keypoint;
         vpMbGenericTracker *tracker;
         vector<int> trackerTypes;
+        vpVideoWriter writer;
+
 
         vpRealSense2 realsense;
         vpImage<vpRGBa> I_color, ILearned, I_depth_color; 
@@ -183,13 +190,5 @@ class visual_servoing
 
         unsigned int _posx{100}, _posy{50};
 
-        std::map<std::string, vpHomogeneousMatrix> mapOfCameraTransformations;
-        std::map<std::string, const vpImage<vpRGBa> *> mapOfImages;
-        std::map<std::string, std::string> mapOfInitFiles;
-        std::map<std::string, std::string> mapOfInitPoses;
-        std::map<std::string, const std::vector<vpColVector> *> mapOfPointclouds;
-        std::map<std::string, unsigned int> mapOfWidths, mapOfHeights;
-        std::map<std::string, vpHomogeneousMatrix> mapOfCameraPoses;
-        std::vector<vpColVector> pointcloud;
-
+                
 };
