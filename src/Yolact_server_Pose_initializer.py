@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from pickletools import uint8
 import rospy
 from tracker_visp.srv import *
 from tracker_visp.msg import *

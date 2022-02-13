@@ -7,11 +7,15 @@ visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh), s(vpFea
 {
 
   client = node_handle.serviceClient<tracker_visp::YolactInitializeCaoPose>("/YolactInitializeCaoPose");
+  client_force = node_handle.serviceClient<tracker_visp::ForceBasedDecision>("/ForceBasedDecision");
   trackerEstimation = node_handle.advertise<geometry_msgs::Pose>("/pose_estimation", 1);
   velocityInput = node_handle.advertise<geometry_msgs::TwistStamped>("/servo_server/delta_twist_cmds", 1);
   startingPos = node_handle.advertise<geometry_msgs::PoseStamped>("/initialGuestPos", 1);
   servoPub = node_handle.advertise<tracker_visp::angle_velocity>("/servo", 1);
+  lastPose = node_handle.advertise<geometry_msgs::Pose>("/lastPose", 1);
+
   subLearning = node_handle.subscribe("/tracker_params/learning_phase", 1, &visual_servoing::learningCallback, this);
+  subForce = node_handle.subscribe("/retract", 1, &visual_servoing::forceCallback, this);
   // To wait a bit before publishing to /servo
   ros::Duration(1.0).sleep();
   init_startLoop();
@@ -40,6 +44,7 @@ void visual_servoing::estimationCallback(const geometry_msgs::Pose& tracker_pose
 
   vpColVector v_ee(3), omega_ee(3), v(6), e1(6);
   //e1 = 0;
+  threshold_pose = 0.12;
 
   if (!block_axis) {
     camTtarget = visp_bridge::toVispHomogeneousMatrix(tracker_pose_P); 
@@ -78,26 +83,135 @@ void visual_servoing::estimationCallback(const geometry_msgs::Pose& tracker_pose
   else {
 
     if (take_cTo) {
-      // baseTtarget = homogeneousTransformation("edo_base_link", "handeye_target");
-      // ros::Duration(3).sleep();
-      // ROS_INFO("New pose took");
+
       take_cTo = false;
-      baseTtarget.print();
+      lastPose.publish(tracker_pose_P);
+      lastPoseReceived = tracker_pose_P;
     }
 
     else {    
       block_axis = true;
-      //velocityData = approach(velocityData);
-      velocityData.twist.linear.z = 0.04;
-      velocityInput.publish(velocityData);
+
+      if (lastPoseReceived.position.z - camTtarget[2][3] < threshold_pose && retract == false )  {
+        signPoseReceived = 1.0; 
+        velocityData.twist.linear.z = signPoseReceived*0.04;
+        velocityInput.publish(velocityData);
+      }
+
+      else if (lastPoseReceived.position.z - camTtarget[2][3] < 0 && retract == true)  {
+        signPoseReceived = 0.0; 
+        run_completed = true;
+        go_to_service = true;
+      }
+
+      else {
+        signPoseReceived = -1.0; 
+        velocityData.twist.linear.z = signPoseReceived*0.04;
+        velocityInput.publish(velocityData);
+        retract = true;
+      }
+
+
       }
     }
 
+}
 
+void visual_servoing::forceCallback(const std_msgs::BoolConstPtr& retract_call) 
+{
+  retract = retract_call->data;
+
+  if (retract) {
+    ROS_INFO("I am retracting");
+    f_max = retract;
+  }
 
 }
 
+double visual_servoing::toBlocktransl(tracker_visp::location block)
+{
+  cout << "block choice is " << block_choice << endl;
+  double n_blocks{0.0};
+  double sign_block{0.0};
+  double dim{0.025};
+  //block.orientation = to_string(block.orientation);
+  if (block.orientation == "sx"){
 
+    if (block_choice.position == "sx" and block.position == "dx") {
+      n_blocks = 2.0;
+      sign_block = 1.0;
+    }
+
+    else if (block_choice.position == "sx" and block.position == "cx") {
+      n_blocks = 1.0;
+      sign_block = 1.0;
+    }
+
+    else if (block_choice.position == "dx" and block.position == "sx") {
+      n_blocks = 2.0;
+      sign_block = -1.0;
+    }
+
+    else if (block_choice.position == "dx" and block.position == "cx") {
+      n_blocks = 1.0;
+      sign_block = -1.0;
+    }
+
+    else if (block_choice.position == "cx" and block.position == "dx") {
+      n_blocks = 1.0;
+      sign_block = 1.0;
+    }
+
+    else if (block_choice.position == "cx" and block.position == "sx") {
+      n_blocks = 1.0;
+      sign_block = -1.0;
+    }
+
+  }
+
+  else if (block.orientation == "dx"){
+    if (block_choice.position == "sx" and block.position == "dx") {
+
+      n_blocks = 2.0;
+      sign_block = 1.0;
+
+    }
+
+    else if (block_choice.position == "sx" and block.position == "cx") {
+      n_blocks = 1.0;
+      sign_block = 1.0;
+    }
+
+    else if (block_choice.position == "dx" and block.position == "sx") {
+      n_blocks = 2.0;
+      sign_block = -1.0;
+    }
+
+    else if (block_choice.position == "dx" and block.position == "cx") {
+      n_blocks = 1.0;
+      sign_block = -1.0;
+    }
+
+    else if (block_choice.position == "cx" and block.position == "dx") {
+      n_blocks = 1.0;
+      sign_block = 1.0;
+    }
+
+    else if (block_choice.position == "cx" and block.position == "sx") {
+      n_blocks = 1.0;
+      sign_block = -1.0;
+    }    
+  }
+
+  else {
+    ROS_INFO("Please provide a correct orientation convention");
+  }
+
+  translX_policy = sign_block*n_blocks*dim; 
+  cout << "translX_policy is " << translX_policy <<endl;
+  block_choice = block;
+  return translX_policy;
+}
 
 
 vpHomogeneousMatrix visual_servoing::homogeneousTransformation(string link1, string link3) 
@@ -332,7 +446,44 @@ void visual_servoing::init_shortLoop()
   tracker->setUseKltTracking("occluded",false);
   tracker->setUseDepthDenseTracking("occluded",false);
 }
+void visual_servoing::reinit_vs() {
+  camTtarget = homogeneousTransformation("camera_color_optical_frame", "handeye_target2");
+  targetTcam = homogeneousTransformation("handeye_target2", "camera_color_optical_frame");
+  baseTtarget = homogeneousTransformation("edo_base_link", "handeye_target2");
+  eeTtarget = homogeneousTransformation("edo_gripper_link_ee", "handeye_target2");
+  eeTcam = homogeneousTransformation("edo_gripper_link_ee", "camera_color_optical_frame");
+  baseTee = homogeneousTransformation("edo_base_link", "edo_gripper_link_ee");
+  camTee=homogeneousTransformation("edo_gripper_link_ee", "camera_color_optical_frame"); 
+  camTbase = homogeneousTransformation("camera_color_optical_frame", "edo_base_link");
 
+  vpThetaUVector cTo_tu = camTtarget.getThetaUVector();
+
+  vpTranslationVector cdto;
+  translX = translX - translX_policy;  //the correct one is x = -0.0035;
+  translY = 0.058;  //the correct one is y = 0.053;
+  translZ = 0.27;   //the correct one is z = 0.134
+
+  cdto.buildFrom(translX, translY, translZ);
+  vpRotationMatrix cdRo{1, 0, 0,
+  0, 1, 0, 
+  0, 0, 1};
+
+  cdTtarget.buildFrom(cdto, cdRo);
+
+  cout << cdto <<endl;
+
+  cdTc = cdTtarget*targetTcam;
+
+  s.buildFrom(camTtarget);
+  s_star.buildFrom(cdTtarget);
+
+  s_tu.buildFrom(cdTc);
+
+  error = 5;
+  threshold = 0.00002;
+  block_axis = false;
+
+}
 int visual_servoing::init_matrices() 
 { 
   geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
@@ -348,46 +499,15 @@ int visual_servoing::init_matrices()
   camTee=homogeneousTransformation("edo_gripper_link_ee", "camera_color_optical_frame"); 
   camTbase = homogeneousTransformation("camera_color_optical_frame", "edo_base_link");
 
-  // vpTranslationVector t_off; t_off << 0.0, -0.0, -0.25;
-  // vpRxyzVector rxyz; rxyz << 0, 0, -M_PI_2;
-  // vpRotationMatrix R_off(rxyz);
-  // offset.buildFrom(t_off, R_off.inverse());
-  
-  //base2target = baseTee*eeTtarget; 
-  //initialGuestPos = insertPosData(base2target*offset);
-  //startingPos.publish(initialGuestPos);
-  //ros::Duration(10).sleep();
-
-  // bool initialPose{true};
-
-  // ros::service::waitForService("/InitialGuess");
-  // srv.request.initialGuessPose = initialPose;
-  // ROS_INFO("Calling the service..");
-
-  // if (client.call(srv)){
-  //   if (srv.response.execution.data == true) {
-  //     ROS_INFO("Approaching the target");
-  //   }
-  //   else {
-  //     ROS_INFO("Initial guess cannot be provided");
-  //     return EXIT_FAILURE;
-  //   }
-  
-  // }
-
-  // else {
-  //   ROS_ERROR("Cannot receive response from server");
-  // }
-
   vpThetaUVector cTo_tu = camTtarget.getThetaUVector();
 
   vpTranslationVector cdto;
-  translX = 0.0324;  //the correct one is x = -0.0035;
-  translY = 0.06;  //the correct one is y = 0.053;
+  translX = 0.0324 - translX_policy;  //the correct one is x = -0.0035;
+  translY = 0.058;  //the correct one is y = 0.053;
   translZ = 0.27;   //the correct one is z = 0.134
 
   cdto.buildFrom(translX, translY, translZ);
-  vpRotationMatrix cdRo{1, 0, 0, 
+  vpRotationMatrix cdRo{1, 0, 0,
   0, 1, 0, 
   0, 0, 1};
 
@@ -395,15 +515,7 @@ int visual_servoing::init_matrices()
 
   cdTc = cdTtarget*targetTcam;
 
-  static tf2_ros::TransformBroadcaster br;
-  geometry_msgs::TransformStamped target;
-
-  target.header.stamp = ros::Time::now();
-  target.header.frame_id = "camera_desired";
-  target.child_frame_id = "handeye_target";
-  target.transform=visp_bridge::toGeometryMsgsTransform(cdTtarget); 
-
-  br.sendTransform(target);
+  return 0;
  
 }
 
@@ -514,7 +626,6 @@ void visual_servoing::learning_process()
         // Send image and cam par to service, where Python node responds with cao_file and pose
         ROS_INFO("Subscribing to service...");
         ros::service::waitForService("/YolactInitializeCaoPose"); 
-        tracker_visp::YolactInitializeCaoPose srv;
         srv.request.image = sensor_image;
         srv.request.camInfo = sensor_camInfo;
         ROS_INFO("Starting call to service..");
@@ -523,6 +634,10 @@ void visual_servoing::learning_process()
           ROS_INFO("Response from service..");
           opt_model=srv.response.caoFilePath.data;
           if (opt_model!=""){
+            block_choice = srv.response.initPose.location;
+
+            cout << "The chosen block is " << block_choice << endl; 
+
             geometry_msgs::Pose initPose=srv.response.initPose.pose.pose;
             cMo=visp_bridge::toVispHomogeneousMatrix(initPose);	//object pose cMo
             tracker->loadModel(opt_model, opt_model);
@@ -581,6 +696,7 @@ void visual_servoing::learning_process()
     
     bool quit = false;
     static tf2_ros::TransformBroadcaster br;
+    static tf2_ros::StaticTransformBroadcaster br_static;
     // Define camera's RF for girst initialization
     wTc = homogeneousTransformation("world", "camera_color_optical_frame");
     vpTranslationVector t1; t1 << 0.0,0, 0;
@@ -671,27 +787,29 @@ void visual_servoing::learning_process()
       
       vpTranslationVector t_cam; t_cam << 0.54, 0.08, 0.4;
       vpQuaternionVector q_cam, q_unit; q_cam << 0, 0, 0.7071068, 0.7071068;
-      
-      //eeTc.buildFrom(t_cam, q_cam);
-      //geometry_msgs::TransformStamped camera_RF = toMoveit(eeTc, "world", "object");
-      //br.sendTransform(camera_RF);
-      
-      //geometry_msgs::TransformStamped camera_1 = toMoveit(wTc1, "world", "camera_1");
-      //br.sendTransform(camera_1);
+
 
       // Get and publish object pose
       cMo = tracker->getPose();
+
       //cTo = cMo;
       //q_unit << 0, 0, 0, 1;
       //cTo.insert(q_unit); //only for simulation
+      geometry_msgs::Pose forward_IK = move_group.getCurrentPose("edo_link_ee").pose;
+      bTee = visp_bridge::toVispHomogeneousMatrix(forward_IK); 
+      vpThetaUVector bTee_tu = bTee.getThetaUVector();
+
+      vpThetaUVector cMo_tu = cMo.getThetaUVector();
+      cMo_tu[0] = -(M_PI_2-bTee_tu[1]); 
+      cMo_tu[2] = 0; 
+      cMo.insert(cMo_tu);
+      
       geometry_msgs::TransformStamped pose_target = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target");
       br.sendTransform(pose_target);
 
-      
       geometry_msgs::Pose cTo_P;
       cTo_P = visp_bridge::toGeometryMsgsPose(cMo); 
       trackerEstimation.publish(cTo_P);
-      
 
       // Check tracking errors
       double proj_error = tracker->getProjectionError();
@@ -740,6 +858,8 @@ void visual_servoing::learning_process()
       if (vpDisplay::getClick(I_color, button, false)) {
         if (button == vpMouseButton::button3) {
           quit = true;
+          geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
+          br_static.sendTransform(pose_target2);
           init_matrices();
           init_servo();
         }
@@ -820,8 +940,6 @@ void visual_servoing::learning_process()
         train_t_vec.push_back(vpTime::measureTimeMs() - train_t);
       }
 
-
-
     }
 
     //! -----------------------------------------------------------------------------------------------
@@ -857,9 +975,13 @@ void visual_servoing::detection_process()
   // opt_learn = false;
   // opt_auto_init = true; 
   // opt_yolact_init = false;
-
-  // Learned keypoints start
-  keypoint.loadLearningData(opt_learning_data, true);
+    if (vpIoTools::checkFilename(opt_learning_data)){
+    keypoint.loadLearningData(opt_learning_data, true);
+  }
+  else {
+    ROS_ERROR("Could not find learning file");
+    return;
+  }
   vpImageConvert::convert(I_color,I_gray);
   keypoint.createImageMatching(I_gray, IMatching);
   d3.setDownScalingFactor(vpDisplay::SCALE_AUTO);
@@ -874,20 +996,6 @@ void visual_servoing::detection_process()
   mapOfImages["Camera2"] = &I_depth_color;
   // mapOfInitFiles["Camera1"] = opt_init;
   // mapOfInitPoses["Camera1"] = opt_init_pos;
-
-  // [Load all info in the tracker]
-  // Define tracker types
-  /*
-  trackerTypes.push_back(vpMbGenericTracker::EDGE_TRACKER | vpMbGenericTracker::KLT_TRACKER);
-  trackerTypes.push_back(vpMbGenericTracker::DEPTH_DENSE_TRACKER);
-
-  tracker = new vpMbGenericTracker(trackerTypes);
-  
-  tracker->loadConfigFile(opt_config, opt_config);
-  tracker->loadModel(opt_model, opt_model);
-  tracker->setCameraTransformationMatrix(mapOfCameraTransformations);
-  tracker->setCameraParameters(cam_color, cam_depth);
-  */
 
   // Load auto learn data, or initialize with clicks
   // Preparation for automatic initialization
@@ -924,6 +1032,7 @@ void visual_servoing::detection_process()
     
     bool quit = false;
     static tf2_ros::TransformBroadcaster br;
+    static tf2_ros::StaticTransformBroadcaster br_static;
 
     // Define camera's RF for girst initialization
     wTc = homogeneousTransformation("world", "camera_color_optical_frame");
@@ -933,10 +1042,7 @@ void visual_servoing::detection_process()
     eeTc1.buildFrom(t1, q_1);
     wTc1 = wTc*eeTc1.inverse();
 
-    init_matrices();
-    init_servo();
-
-    
+   
     //! [LOOP]
     //! -----------------------------------------------------------------------------------------------
     while (!quit && node_handle.ok() ) {
@@ -989,11 +1095,6 @@ void visual_servoing::detection_process()
           continue;
         }
       }
-      // else if (tracking_failed) {
-      //   // Manual init
-      //   tracking_failed = false;
-      //   tracker->initClick(mapOfImages, mapOfInitFiles, true);
-      // }
 
       // Run the tracker
       try {
@@ -1011,33 +1112,67 @@ void visual_servoing::detection_process()
         run_auto_init = true;
         // }
       }
-
-      // Define camera's RF
       
       vpTranslationVector t_cam; t_cam << 0.54, 0.08, 0.4;
       vpQuaternionVector q_cam, q_unit; q_cam << 0, 0, 0.7071068, 0.7071068;
-      
-      //eeTc.buildFrom(t_cam, q_cam);
-      //geometry_msgs::TransformStamped camera_RF = toMoveit(eeTc, "world", "object");
-      //br.sendTransform(camera_RF);
-      
-      //geometry_msgs::TransformStamped camera_1 = toMoveit(wTc1, "world", "camera_1");
-      //br.sendTransform(camera_1);
 
       // Get and publish object pose
       cMo = tracker->getPose();
       //cTo = cMo;
       //q_unit << 0, 0, 0, 1;
       //cTo.insert(q_unit); //only for simulation
+
+      geometry_msgs::Pose forward_IK = move_group.getCurrentPose("edo_link_ee").pose;
+      bTee = visp_bridge::toVispHomogeneousMatrix(forward_IK); 
+      vpThetaUVector bTee_tu = bTee.getThetaUVector();
+
+      vpThetaUVector cMo_tu = cMo.getThetaUVector();
+      cMo_tu[0] = -(M_PI_2-bTee_tu[1]); 
+      cMo_tu[2] = 0; 
+      cMo.insert(cMo_tu);
+
       geometry_msgs::TransformStamped pose_target = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target");
       br.sendTransform(pose_target);
 
-      
       geometry_msgs::Pose cTo_P;
       cTo_P = visp_bridge::toGeometryMsgsPose(cMo); 
       trackerEstimation.publish(cTo_P);
 
       estimationCallback(cTo_P);
+
+      if (run_completed && retract && go_to_service) {
+        ROS_INFO("Subscribing to service...");
+        ros::service::waitForService("/ForceBasedDecision"); 
+        srv_force.request.BeyondFmax.data = f_max;
+        if (client_force.call(srv_force)) {
+          new_block = srv_force.response.NewBlock;
+
+          if (!new_block.position.empty()) {
+        
+            if (f_max) {
+              translX_policy = toBlocktransl(new_block);
+              geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
+              br_static.sendTransform(pose_target2);
+              reinit_vs();
+
+              // Re initialize parameters
+              retract = false;
+              f_max = false;
+              run_completed = false;
+            }
+
+            else {
+              ROS_INFO("I should change the layer! Call the service and change layer, reinitializing everything");
+            }
+          }
+
+          else {
+            ROS_INFO("I should change the layer");
+          }
+        }
+        go_to_service = false;
+
+      }
       
       // Check tracking errors
       double proj_error = tracker->getProjectionError();
@@ -1126,8 +1261,6 @@ void visual_servoing::detection_process()
   } catch (const vpException &e) {
     std::cout << "Catch an exception: " << e.what() << std::endl;
   }
-
-
 
 }
 
