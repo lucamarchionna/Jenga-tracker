@@ -299,10 +299,10 @@ class Blocks_group():
         if self.startIdx!=-1:
             self.masked_group=self.start_block.draw_corners(self.masked_group)
             cv2.circle(self.masked_group,self.start_block.centroid,3,[0,255,0],thickness=-1)
-        if self.upIdx!=-1:
-            self.masked_group=self.up_block.draw_corners(self.masked_group)
-        if self.downIdx!=-1:
-            self.masked_group=self.down_block.draw_corners(self.masked_group)
+        # if self.upIdx!=-1:
+        #     self.masked_group=self.up_block.draw_corners(self.masked_group)
+        # if self.downIdx!=-1:
+        #     self.masked_group=self.down_block.draw_corners(self.masked_group)
         if self.rightIdx[0]!=-1:
             self.masked_group=self.right0_block.draw_corners(self.masked_group)
         if self.rightIdx[1]!=-1:
@@ -311,6 +311,16 @@ class Blocks_group():
             self.masked_group=self.left0_block.draw_corners(self.masked_group)
         if self.leftIdx[1]!=-1:
             self.masked_group=self.left1_block.draw_corners(self.masked_group)
+        if self.up1Idx!=-1 and self.up1_block.block_type=="front_face":
+            self.masked_group=self.up1_block.draw_corners(self.masked_group)            
+        if self.up1left0Idx!=-1 and self.up1left0_block.block_type=="front_face":
+            self.masked_group=self.up1left0_block.draw_corners(self.masked_group)
+        if self.up1right0Idx!=-1 and self.up1right0_block.block_type=="front_face":
+            self.masked_group=self.up1right0_block.draw_corners(self.masked_group)  
+        if self.up1left1Idx!=-1 and self.up1left1_block.block_type=="front_face":
+            self.masked_group=self.up1left1_block.draw_corners(self.masked_group)
+        if self.up1right1Idx!=-1 and self.up1right1_block.block_type=="front_face":
+            self.masked_group=self.up1right1_block.draw_corners(self.masked_group)                        
 
         return self.masked_group
 
@@ -674,7 +684,7 @@ class Blocks_group():
                 self.init_impt.append(ordered_corners)
                 self.init_objp.append(ordered_objp(self.target_move_up1left0))
         if self.up1left1Idx!=-1 and self.up1left1_block.block_type=="front_face":
-            ordered_corners=self.up1left1Idx.ordered_corners()
+            ordered_corners=self.up1left1_block.ordered_corners()
             if len(ordered_corners)>0:
                 self.init_impt.append(ordered_corners)
                 self.init_objp.append(ordered_objp(self.target_move_up1left1))       

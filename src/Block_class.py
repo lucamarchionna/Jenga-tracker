@@ -21,13 +21,17 @@ class Block():
             self.contours_all, _ = cv2.findContours(self.maskcv2,retr_list,chain_approx)
         except ValueError:
             _, self.contours_all, _ = cv2.findContours(self.maskcv2,retr_list,chain_approx)
-        self.contour_max=max(self.contours_all,key=cv2.contourArea)
-        self.area=cv2.contourArea(self.contour_max)
-        moments = cv2.moments(self.contour_max)
-        self.centroid=(int(moments['m10']/moments['m00']),int(moments['m01']/moments['m00']))
-        self.mask_single=np.zeros(self.maskcv2.shape,dtype=np.uint8)
-        #cv2.fillConvexPoly(self.mask_single,self.contour_max,255)
-        cv2.drawContours(self.mask_single,[self.contour_max],-1,255,thickness=-1)
+        if self.contours_all:
+            self.contour_max=max(self.contours_all,key=cv2.contourArea)
+            self.area=cv2.contourArea(self.contour_max)
+            moments = cv2.moments(self.contour_max)
+            self.centroid=(int(moments['m10']/moments['m00']),int(moments['m01']/moments['m00']))
+            self.mask_single=np.zeros(self.maskcv2.shape,dtype=np.uint8)
+            #cv2.fillConvexPoly(self.mask_single,self.contour_max,255)
+            cv2.drawContours(self.mask_single,[self.contour_max],-1,255,thickness=-1)
+            return True
+        else:
+            return False
     
     def draw_contoursAll_centroid(self,img):
         temp=img.copy()
@@ -277,6 +281,35 @@ class Block():
             self.test_down1right0=(int(self.test_down1[0]+self.avgLength_H*self.versor_H[0]),int(self.test_down1[1]+self.avgLength_H*self.versor_H[1]))
         return self.test_down,self.test_right0,self.test_right1,self.test_left0,self.test_left1,\
             self.test_down1,self.test_down1left0,self.test_down1right0
+
+    def compute_up_test_points(self,min_slope_h=2):
+        '''Requires compute_slopes first'''
+        #self.compute_slopes(min_slope_h)
+        #####################
+        self.test_up=(0,0)
+        self.test_right0=(0,0)
+        self.test_right1=(0,0)
+        self.test_left0=(0,0)
+        self.test_left1=(0,0)
+        self.test_up1left0=(0,0)        
+        self.test_up1right0=(0,0)              
+        if self.block_type=='front_face':
+            if self.versor_V[1]>0:  #versor going down
+                self.test_up=(int(self.centroid[0]-self.avgLength_V*self.versor_V[0]),int(self.centroid[1]-self.avgLength_V*self.versor_V[1]))
+                self.test_down=(int(self.centroid[0]+self.avgLength_V*self.versor_V[0]),int(self.centroid[1]+self.avgLength_V*self.versor_V[1]))
+                self.test_up1=(int(self.centroid[0]-2*self.avgLength_V*self.versor_V[0]),int(self.centroid[1]-2*self.avgLength_V*self.versor_V[1]))
+            else: 
+                self.test_up=(int(self.centroid[0]+self.avgLength_V*self.versor_V[0]),int(self.centroid[1]+self.avgLength_V*self.versor_V[1]))
+                self.test_down=(int(self.centroid[0]-self.avgLength_V*self.versor_V[0]),int(self.centroid[1]-self.avgLength_V*self.versor_V[1]))
+                self.test_up1=(int(self.centroid[0]+2*self.avgLength_V*self.versor_V[0]),int(self.centroid[1]+2*self.avgLength_V*self.versor_V[1]))
+            self.test_right0=(int(self.centroid[0]+self.avgLength_H*self.versor_H[0]),int(self.centroid[1]+self.avgLength_H*self.versor_H[1]))
+            self.test_right1=(int(self.centroid[0]+2*self.avgLength_H*self.versor_H[0]),int(self.centroid[1]+2*self.avgLength_H*self.versor_H[1]))
+            self.test_left0=(int(self.centroid[0]-self.avgLength_H*self.versor_H[0]),int(self.centroid[1]-self.avgLength_H*self.versor_H[1]))
+            self.test_left1=(int(self.centroid[0]-2*self.avgLength_H*self.versor_H[0]),int(self.centroid[1]-2*self.avgLength_H*self.versor_H[1]))
+            self.test_up1left0=(int(self.test_up1[0]-self.avgLength_H*self.versor_H[0]),int(self.test_up1[1]-self.avgLength_H*self.versor_H[1]))
+            self.test_up1right0=(int(self.test_up1[0]+self.avgLength_H*self.versor_H[0]),int(self.test_up1[1]+self.avgLength_H*self.versor_H[1]))
+        return self.test_up,self.test_right0,self.test_right1,self.test_left0,self.test_left1,\
+            self.test_up1,self.test_up1left0,self.test_up1right0
 
     def get_centroid_height(self):
         return self.centroid[1]
