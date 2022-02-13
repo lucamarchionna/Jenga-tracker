@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 
-from matplotlib.cbook import to_filehandle
 import rospy
 from tracker_visp.srv import FirstLayerPose
 from tracker_visp.srv import FirstLayerPoseRequest
