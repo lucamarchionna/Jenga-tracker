@@ -29,6 +29,9 @@ class Block():
             self.mask_single=np.zeros(self.maskcv2.shape,dtype=np.uint8)
             #cv2.fillConvexPoly(self.mask_single,self.contour_max,255)
             cv2.drawContours(self.mask_single,[self.contour_max],-1,255,thickness=-1)
+            return True
+        else:
+            return False
     
     def draw_contoursAll_centroid(self,img):
         temp=img.copy()

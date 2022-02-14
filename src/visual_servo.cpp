@@ -373,6 +373,10 @@ void visual_servoing::init_parameters()
 
 }
 void visual_servoing::reinit_vs() {
+  geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
+  static tf2_ros::StaticTransformBroadcaster br_static;
+  br_static.sendTransform(pose_target2);
+
   camTtarget = homogeneousTransformation("camera_color_optical_frame", "handeye_target2");
   targetTcam = homogeneousTransformation("handeye_target2", "camera_color_optical_frame");
   baseTtarget = homogeneousTransformation("edo_base_link", "handeye_target2");
@@ -461,7 +465,11 @@ void visual_servoing::init_servo()
   task.addFeature(s, s_star);
 
   s_tu.buildFrom(cdTc);
-  task.addFeature(s_tu, s_tu_star); //, vpFeatureThetaU::selectTUy() | vpFeatureThetaU::selectTUx());
+
+  if (add_features_once){
+    task.addFeature(s_tu, s_tu_star); //, vpFeatureThetaU::selectTUy() | vpFeatureThetaU::selectTUx());
+    add_features_once=false;
+  }
 
   error = 5;
   threshold = 0.00002;
@@ -794,8 +802,6 @@ void visual_servoing::learning_process()
       if (vpDisplay::getClick(I_color, button, false)) {
         if (button == vpMouseButton::button3) {
           quit = true;
-          geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
-          br_static.sendTransform(pose_target2);
           init_matrices();
           init_servo();
         }
@@ -897,7 +903,15 @@ void visual_servoing::detection_process()
   opt_learn = false;
   opt_auto_init = true; 
   opt_yolact_init = false;
-  keypoint.loadLearningData(opt_learning_data, true);
+
+    if (vpIoTools::checkFilename(opt_learning_data)){
+    keypoint.loadLearningData(opt_learning_data, true);
+  }
+  else {
+    ROS_ERROR("Could not find learning file");
+    return;
+  }
+
   vpImageConvert::convert(I_color,I_gray);
   keypoint.createImageMatching(I_gray, IMatching);
   d3.setDownScalingFactor(vpDisplay::SCALE_AUTO);
@@ -1104,8 +1118,6 @@ void visual_servoing::detection_process()
         
             if (f_max) {
               translX_policy = toBlocktransl(new_block);
-              geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
-              br_static.sendTransform(pose_target2);
               reinit_vs();
 
               // Re initialize parameters
