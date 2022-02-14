@@ -285,6 +285,18 @@ geometry_msgs::TransformStamped visual_servoing::toMoveit(vpHomogeneousMatrix da
 
 void visual_servoing::learningCallback(const std_msgs::Bool::ConstPtr& msg)
 { 
+  // opt_learn = false;
+  // learn_position = false;
+
+  // if (!opt_auto_init) {
+  //   opt_learn = msg->data;
+  // }
+
+  // if (opt_learn) {
+  //   learn_position = true;
+  // }
+
+  //??Equivalent to above??
   learn_position=msg->data;
 
 }
@@ -294,8 +306,14 @@ void visual_servoing::init_startLoop()
   //Settings  
   tracker_path = ros::package::getPath("tracker_visp");
   opt_config = tracker_path + "/trackers/jenga_tracker_params.xml";
+  // opt_model = tracker_path + "/model/file_cao.cao";
+  // opt_init = tracker_path + "/model/jenga_single.init";
+  // opt_init_pos= tracker_path + "/model/file_init.pos";
   opt_learning_data = tracker_path + "/learning/1/data-learned.bin";
   opt_keypoint_config = tracker_path + "/learning/keypoint_config.xml";
+  // opt_learn = true;
+  // opt_auto_init = false;
+  // learn_position = false;
 
   // [Realsense camera configuration]
   config.enable_stream(RS2_STREAM_COLOR, width, height, RS2_FORMAT_RGBA8, fps);
@@ -315,13 +333,15 @@ void visual_servoing::init_startLoop()
     return;
   }
 
-  // [Camera configuration]
   cam_color = realsense.getCameraParameters(RS2_STREAM_COLOR, vpCameraParameters::perspectiveProjWithoutDistortion);
   cam_depth = realsense.getCameraParameters(RS2_STREAM_DEPTH, vpCameraParameters::perspectiveProjWithoutDistortion);
   depth_M_color = realsense.getTransformation(RS2_STREAM_COLOR, RS2_STREAM_DEPTH);
+
   mapOfCameraTransformations["Camera2"] = depth_M_color;
   mapOfWidths["Camera2"] = width;
   mapOfHeights["Camera2"] = height;
+  // mapOfInitFiles["Camera1"] = opt_init;
+  // mapOfInitPoses["Camera1"] = opt_init_pos;
 
   // [Configuration of display]
   width = 640;
@@ -364,19 +384,20 @@ void visual_servoing::init_startLoop()
   //Task details
   task.setServo(vpServo::EYEINHAND_CAMERA); //control law
   task.setInteractionMatrixType(vpServo::CURRENT); //interaction matrix $\bf L$ is computed from the visual features at the desired position
+  
   const vpAdaptiveGain lambda(1.4, 0.6, 30);
   task.setLambda(lambda);
-  // Servo data
+
+  static const std::string PLANNING_GROUP = "edo";
+  moveit::planning_interface::MoveGroupInterface move_group_interface(PLANNING_GROUP);
+  moveit::planning_interface::PlanningSceneInterface planning_scene_interface;  
+
+  // Block axis?
   error = 5;
   threshold = 0.00002;
   block_axis = false;
   vitesse = 0.0002;
   rapport = 0;  
-
-  // Edo moveit definition
-  static const std::string PLANNING_GROUP = "edo";
-  moveit::planning_interface::MoveGroupInterface move_group_interface(PLANNING_GROUP);
-  moveit::planning_interface::PlanningSceneInterface planning_scene_interface;  
 }
 
 void visual_servoing::init_shortLoop()
@@ -528,13 +549,43 @@ void visual_servoing::init_servo()
 
 void visual_servoing::learning_process() 
 {
-  ILearned.init(I_color.getHeight()*2,I_color.getWidth()*2);
+   ILearned.init(I_color.getHeight()*2,I_color.getWidth()*2);
+  // if (opt_learn)
   d3.init(ILearned, _posx+I_color.getWidth()*2+10, _posy, "Learned-images");
+  //
   
+  // opt_learn = true;
+  //opt_auto_init = false; // already in init_parameters()
   learn_position = false;
+
+  // [Map of images to use tracker with depth]
+  // depth_M_color = realsense.getTransformation(RS2_STREAM_COLOR, RS2_STREAM_DEPTH);
+  // std::map<std::string, vpHomogeneousMatrix> mapOfCameraTransformations;
+  // std::map<std::string, const vpImage<vpRGBa> *> mapOfImages;
+  // std::map<std::string, std::string> mapOfInitFiles;
+  // std::map<std::string, std::string> mapOfInitPoses;
+  // std::map<std::string, const std::vector<vpColVector> *> mapOfPointclouds;
+  // std::map<std::string, unsigned int> mapOfWidths, mapOfHeights;
+  // std::map<std::string, vpHomogeneousMatrix> mapOfCameraPoses;
+  // std::vector<vpColVector> pointcloud;
   
+  // mapOfCameraTransformations["Camera2"] = depth_M_color;
   mapOfImages["Camera1"] = &I_color;
   mapOfImages["Camera2"] = &I_depth_color;
+  // mapOfInitFiles["Camera1"] = opt_init;
+  // mapOfInitPoses["Camera1"] = opt_init_pos;
+
+  // Define tracker types
+  
+  // trackerTypes.push_back(vpMbGenericTracker::EDGE_TRACKER | vpMbGenericTracker::KLT_TRACKER);
+  // trackerTypes.push_back(vpMbGenericTracker::DEPTH_DENSE_TRACKER);
+
+  // tracker = new vpMbGenericTracker(trackerTypes);
+  
+  // tracker->loadConfigFile(opt_config, opt_config);
+  
+  // tracker->setCameraTransformationMatrix(mapOfCameraTransformations);
+  // tracker->setCameraParameters(cam_color, cam_depth);
 
   // Check existence of keypoint configuration
   if (vpIoTools::checkFilename(opt_keypoint_config)){
@@ -550,6 +601,7 @@ void visual_servoing::learning_process()
     vpIoTools::remove(vpIoTools::getParent(opt_learning_data));
   vpIoTools::makeDirectory(vpIoTools::getParent(opt_learning_data));
 
+  // else if (opt_yolact_init) {
   // [INITIALIZE WITH YOLACT]
   // [Acquire stream and initialize displays]
   bool terminated = false;
@@ -612,10 +664,35 @@ void visual_servoing::learning_process()
     }
   }
 
+  // // Display and error
+  // tracker->setDisplayFeatures(opt_display_features);
+  // tracker->setProjectionErrorComputation(true);
+  // tracker->setProjectionErrorDisplay(opt_display_projection_error);
+
+  // // Force good moving edges ratio threshold
+  // tracker->setGoodMovingEdgesRatioThreshold(opt_setGoodME_thresh);  //default=0.4
+
+  // // Remove faces with name "occluded" from the tracking, a priori
+  // tracker->setUseEdgeTracking("occluded",false);
+  // tracker->setUseKltTracking("occluded",false);
+  // tracker->setUseDepthDenseTracking("occluded",false);
+ 
+  // Acquire images, visualize and update tracker input data
+  // realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, &pointcloud, NULL, NULL);
+  // vpImageConvert::convert(I_color, I_gray);
+
+  // Before the loop
+  // bool run_auto_init = false;
+  // if (opt_auto_init) {
+  //   run_auto_init = true;
+  // }
+
   std::vector<double> times_vec;
   std::vector<double> train_t_vec;
+  // std::vector<double> detect_t_vec;
   
   try {
+    
     //To be able to display keypoints matching with test-detection-rs2
     int learn_id = 1;
     unsigned int learn_cpt = 0;
@@ -651,18 +728,78 @@ void visual_servoing::learning_process()
       mapOfImages["Camera1"] = &I_color;
       mapOfPointclouds["Camera2"] = &pointcloud;
 
+      // TRACKER MUST NOT FAIL DURING LEARNING //
+      ///////////////////////////////////////////
+      // Run auto initialization from learned data
+      // if (run_auto_init) {
+      //   tracking_failed = false;
+      //   double error;
+      //   double detect_t= vpTime::measureTimeMs();
+      //   vpImageConvert::convert(I_color, I_gray);
+      //   keypoint.insertImageMatching(I_gray, IMatching);
+      //   // DETECTION
+      //   if (keypoint.matchPoint(I_gray, cam_color, cMo, error, elapsedTime)) {
+      //     std::cout << "Auto init succeed in elapsed time: " << elapsedTime << " ms" << std::endl;
+      //     // Show matchings on learned images
+      //     vpDisplay::display(IMatching);
+      //     keypoint.displayMatching(I_gray, IMatching);
+      //     std::stringstream ss;
+      //     ss << "Number of matchings: " << keypoint.getMatchedPointNumber();
+      //     vpDisplay::displayText(IMatching, 20, 20, ss.str(), vpColor::red);
+      //     ss.str("");
+      //     ss  << "Number of references: " << keypoint.getReferencePointNumber();
+      //     vpDisplay::displayText(IMatching, 60, 20, ss.str(), vpColor::red);
+      //     vpDisplay::flush(IMatching);
+      //     mapOfCameraPoses["Camera1"] = cMo;
+      //     mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
+      //     // Initialize from detection
+      //     tracker->initFromPose(mapOfImages, mapOfCameraPoses);
+      //     std::cout << "Detection succeed in elapsed time: " << vpTime::measureTimeMs() - detect_t << " ms" << std::endl;
+      //     detect_t_vec.push_back(vpTime::measureTimeMs() - detect_t);
+      //   } 
+      //   else {
+      //     vpDisplay::flush(I_color);
+      //     vpDisplay::flush(I_depth_color);
+      //     //Keep searching
+      //     continue;
+      //   }
+      // }
+      // else if (tracking_failed) {
+      //   // Manual init
+      //   tracking_failed = false;
+      //   tracker->initClick(mapOfImages, mapOfInitFiles, true);
+      // }
+
       // Run the tracker
       try {
+        // if (run_auto_init) {
+        //   // Turn display features off just after auto init to not display wrong moving-edge if the tracker fails
+        //   tracker->setDisplayFeatures(false);
+        //   run_auto_init = false;
+        // }
         tracker->track(mapOfImages, mapOfPointclouds, mapOfWidths, mapOfHeights);
       } catch (const vpException &e) {
         std::cout << "Tracker exception: " << e.getStringMessage() << std::endl;
         tracking_failed = true;
+        // if (opt_auto_init) {
+        //   //std::cout << "Tracker needs to restart (tracking exception)" << std::endl;
+        //   run_auto_init = true;
+        // }
       }
 
-      // Get object pose
+
+      // Define camera's RF
+      
+      vpTranslationVector t_cam; t_cam << 0.54, 0.08, 0.4;
+      vpQuaternionVector q_cam, q_unit; q_cam << 0, 0, 0.7071068, 0.7071068;
+
+
+      // Get and publish object pose
       cMo = tracker->getPose();
 
-      // Publish object pose
+      //cTo = cMo;
+      //q_unit << 0, 0, 0, 1;
+      //cTo.insert(q_unit); //only for simulation
       geometry_msgs::Pose forward_IK = move_group.getCurrentPose("edo_link_ee").pose;
       bTee = visp_bridge::toVispHomogeneousMatrix(forward_IK); 
       vpThetaUVector bTee_tu = bTee.getThetaUVector();
@@ -683,6 +820,9 @@ void visual_servoing::learning_process()
       double proj_error = tracker->getProjectionError();
       if (proj_error > opt_proj_error_threshold) {
         std::cout << "Tracker needs to restart (projection error detected: " << proj_error << ")" << std::endl;
+        // if (opt_auto_init) {
+        //     run_auto_init = true;
+        //   }
         tracking_failed = true;
       }
 
@@ -732,7 +872,7 @@ void visual_servoing::learning_process()
           learn_position = true;
       }
 
-      // Loop time
+      // Loop time without training
       loop_t = vpTime::measureTimeMs() - t;
       times_vec.push_back(loop_t);
 
@@ -740,10 +880,15 @@ void visual_servoing::learning_process()
       //Rotating base to learn from it
       if (!rotated && !tracking_failed) {
 
+      // // Run auto initialization from learned data
+      // Don't, this is the learning phase yet
+      //   if ((opt_auto_init && keypoint.matchPoint(I_gray, cam_color, cMo)) || opt_yolact_init) {
+
       // SERVO SEND ANGLE
         vpThetaUVector cTo_tu = cMo.getThetaUVector();
         tracker_visp::angle_velocity angleVel_to_servo;
         angleVel_to_servo.velocity = 0.01; //degrees/ms, velocity slow
+        // std::cout << "Theta: \n" << angle << std::endl;
         if (cTo_tu[1]<0){	//radians, "right face seen from camera"
           angleVel_to_servo.angle = 130;	//degrees, final angle
           servoPub.publish(angleVel_to_servo);
@@ -832,6 +977,9 @@ void visual_servoing::learning_process()
 void visual_servoing::detection_process() 
 {
   
+  // opt_learn = false;
+  // opt_auto_init = true; 
+  // opt_yolact_init = false;
     if (vpIoTools::checkFilename(opt_learning_data)){
     keypoint.loadLearningData(opt_learning_data, true);
   }
@@ -844,8 +992,15 @@ void visual_servoing::detection_process()
   d3.setDownScalingFactor(vpDisplay::SCALE_AUTO);
   d3.init(IMatching, _posx+I_gray.getWidth()*2+10, _posy, "Detection-from-learned");
 
+  // [Map of images to use tracker with depth]
+  // Already done
+  // depth_M_color = realsense.getTransformation(RS2_STREAM_COLOR, RS2_STREAM_DEPTH);
+  
+  // mapOfCameraTransformations["Camera2"] = depth_M_color;
   mapOfImages["Camera1"] = &I_color;
   mapOfImages["Camera2"] = &I_depth_color;
+  // mapOfInitFiles["Camera1"] = opt_init;
+  // mapOfInitPoses["Camera1"] = opt_init_pos;
 
   // Load auto learn data, or initialize with clicks
   // Preparation for automatic initialization
@@ -853,10 +1008,24 @@ void visual_servoing::detection_process()
     std::cout << "Cannot enable auto detection. Learning file \"" << opt_learning_data << "\" doesn't exist" << std::endl;
     //return EXIT_FAILURE;
   }
+  // vpImageConvert::convert(I_color, I_gray);
+
+  // d3.setDownScalingFactor(vpDisplay::SCALE_AUTO);
+  // d3.init(IMatching, _posx+I_gray.getWidth()*2+10, _posy, "Detection-from-learned");
+
+  // Display and error
+  // tracker->setDisplayFeatures(opt_display_features);
+  // tracker->setProjectionErrorComputation(true);
+  // tracker->setProjectionErrorDisplay(opt_display_projection_error);
 
   // Force good moving edges ratio threshold
   tracker->setGoodMovingEdgesRatioThreshold(opt_setGoodME_thresh);  //default=0.4
 
+  // Remove faces with name "occluded" from the tracking, a priori
+  // tracker->setUseEdgeTracking("occluded",false);
+  // tracker->setUseKltTracking("occluded",false);
+  // tracker->setUseDepthDenseTracking("occluded",false);
+  
   // Before the loop
   bool run_auto_init =true;
 
@@ -943,12 +1112,20 @@ void visual_servoing::detection_process()
       } catch (const vpException &e) {
         std::cout << "Tracker exception: " << e.getStringMessage() << std::endl;
         tracking_failed = true;
+        // if (opt_auto_init) {
+          //std::cout << "Tracker needs to restart (tracking exception)" << std::endl;
         run_auto_init = true;
         // }
       }
+      
+      vpTranslationVector t_cam; t_cam << 0.54, 0.08, 0.4;
+      vpQuaternionVector q_cam, q_unit; q_cam << 0, 0, 0.7071068, 0.7071068;
 
       // Get and publish object pose
       cMo = tracker->getPose();
+      //cTo = cMo;
+      //q_unit << 0, 0, 0, 1;
+      //cTo.insert(q_unit); //only for simulation
 
       geometry_msgs::Pose forward_IK = move_group.getCurrentPose("edo_link_ee").pose;
       bTee = visp_bridge::toVispHomogeneousMatrix(forward_IK); 
@@ -1006,7 +1183,9 @@ void visual_servoing::detection_process()
       double proj_error = tracker->getProjectionError();
       if (proj_error > opt_proj_error_threshold) {
         std::cout << "Tracker needs to restart (projection error detected: " << proj_error << ")" << std::endl;
+        // if (opt_auto_init) {
         run_auto_init = true;
+          // }
         tracking_failed = true;
       }
 
@@ -1053,7 +1232,7 @@ void visual_servoing::detection_process()
         }
       }
 
-      // Loop time
+      // Loop time without training
       loop_t = vpTime::measureTimeMs() - t;
       times_vec.push_back(loop_t);
 
