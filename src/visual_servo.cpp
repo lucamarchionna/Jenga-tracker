@@ -13,6 +13,7 @@ visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh), s(vpFea
   startingPos = node_handle.advertise<geometry_msgs::PoseStamped>("/initialGuestPos", 1);
   servoPub = node_handle.advertise<tracker_visp::angle_velocity>("/servo", 1);
   lastPose = node_handle.advertise<geometry_msgs::Pose>("/lastPose", 1);
+  pub_cartesian = node_handle.advertise<geometry_msgs::PoseStamped>("/cartesian", 1);
 
   subLearning = node_handle.subscribe("/tracker_params/learning_phase", 1, &visual_servoing::learningCallback, this);
   subForce = node_handle.subscribe("/retract", 1, &visual_servoing::forceCallback, this);
@@ -21,8 +22,10 @@ visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh), s(vpFea
   init_startLoop();
   ROS_INFO_STREAM("Start loop");
 
-  for(int i=0;i<3;i++){
+  for(int i=0;i<4;i++){
+        
     init_shortLoop();
+    init_matrices();
     ROS_INFO_STREAM("Continue loop");    
 
     learning_process();
@@ -338,6 +341,11 @@ void visual_servoing::init_startLoop()
   d1.init(I_color, _posx, _posy, "Color stream");
   d2.init(I_depth_color, _posx, _posy + I_gray.getHeight()+10, "Depth stream");
 
+  geometry_msgs::PoseStamped default_pose;
+  default_pose.pose.position.x = 0.1;
+  default_pose.pose.position.z = 0.7;
+
+
   // [Acquire stream and initialize displays]
   while (node_handle.ok()) {
     realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, NULL, NULL);
@@ -387,6 +395,11 @@ void visual_servoing::init_shortLoop()
   angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
   servoPub.publish(angleVel_to_servo);
 
+  geometry_msgs::PoseStamped default_pose;
+  default_pose.pose.position.x = 0.1;
+  default_pose.pose.position.z = 0.7;
+
+
 
   // [Acquire stream and initialize displays]
   while (node_handle.ok()) {
@@ -426,8 +439,17 @@ void visual_servoing::init_shortLoop()
   tracker->setUseEdgeTracking("occluded",false);
   tracker->setUseKltTracking("occluded",false);
   tracker->setUseDepthDenseTracking("occluded",false);
+
+  retract = false;
+  f_max = false;
+  run_completed = false;
 }
+
 void visual_servoing::reinit_vs() {
+  geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
+  static tf2_ros::StaticTransformBroadcaster br_static;
+  br_static.sendTransform(pose_target2);
+
   camTtarget = homogeneousTransformation("camera_color_optical_frame", "handeye_target2");
   targetTcam = homogeneousTransformation("handeye_target2", "camera_color_optical_frame");
   baseTtarget = homogeneousTransformation("edo_base_link", "handeye_target2");
@@ -481,6 +503,8 @@ int visual_servoing::init_matrices()
   camTbase = homogeneousTransformation("camera_color_optical_frame", "edo_base_link");
 
   vpThetaUVector cTo_tu = camTtarget.getThetaUVector();
+
+  translX_policy = 0;
 
   vpTranslationVector cdto;
   translX = 0.0324 - translX_policy;  //the correct one is x = -0.0035;
@@ -586,6 +610,7 @@ void visual_servoing::learning_process()
         {
           ROS_INFO("Response from service..");
           opt_model=srv.response.caoFilePath.data;
+
           if (opt_model!=""){
             block_choice = srv.response.initPose.location;
 
@@ -979,8 +1004,6 @@ void visual_servoing::detection_process()
         
             if (f_max) {
               translX_policy = toBlocktransl(new_block);
-              geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
-              br_static.sendTransform(pose_target2);
               reinit_vs();
 
               // Re initialize parameters
@@ -990,12 +1013,14 @@ void visual_servoing::detection_process()
             }
 
             else {
-              ROS_INFO("I should change the layer! Call the service and change layer, reinitializing everything");
+              ROS_INFO("I removed the block successfully! Lest's call the service and change layer, reinitializing everything");
+              quit = true;
             }
           }
 
           else {
             ROS_INFO("I should change the layer");
+            quit = true;
           }
         }
         go_to_service = false;
@@ -1072,10 +1097,6 @@ void visual_servoing::detection_process()
     servoPub.publish(angleVel_to_servo);
 
     if (!times_vec.empty()) {
-      tracker_visp::angle_velocity angleVel_to_servo;
-      angleVel_to_servo.angle = 90;	//degrees, setup angle
-      angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
-      servoPub.publish(angleVel_to_servo);
     std::cout << "\nProcessing time, Mean: " << vpMath::getMean(times_vec) << " ms ; Median: " << vpMath::getMedian(times_vec)
               << " ; Std: " << vpMath::getStdev(times_vec) << " ms" << std::endl;
     }

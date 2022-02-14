@@ -163,7 +163,7 @@ class visual_servoing
         //const vpException &e;
         
         
-        ros::Publisher pub, lastPose;
+        ros::Publisher pub, lastPose, pub_cartesian;
         double opt_learn, opt_auto_init, opt_proj_error_threshold{25.0}, opt_setGoodME_thresh{0.4};
         int opt_disp_visibility{0}, width{640}, height{480}, fps{30};
         bool opt_display_projection_error{false}, opt_display_features{false}, opt_display_model{true}, opt_yolact_init{true}, opt_pose_init{true}, learn_position{true}, rotated{false}, f_max{false}, run_completed{false};
