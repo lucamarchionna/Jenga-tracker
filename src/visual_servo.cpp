@@ -13,6 +13,7 @@ visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh), s(vpFea
   startingPos = node_handle.advertise<geometry_msgs::PoseStamped>("/initialGuestPos", 1);
   servoPub = node_handle.advertise<tracker_visp::angle_velocity>("/servo", 1);
   lastPose = node_handle.advertise<geometry_msgs::Pose>("/lastPose", 1);
+  pub_cartesian = node_handle.advertise<geometry_msgs::PoseStamped>("/cartesian", 1);
 
   subLearning = node_handle.subscribe("/tracker_params/learning_phase", 1, &visual_servoing::learningCallback, this);
   subForce = node_handle.subscribe("/retract", 1, &visual_servoing::forceCallback, this);
@@ -345,6 +346,11 @@ void visual_servoing::init_parameters()
     d3.init(ILearned, _posx+I_color.getWidth()*2+10, _posy, "Learned-images");
   }
   
+  geometry_msgs::PoseStamped default_pose;
+  default_pose.pose.position.x = 0.1;
+  default_pose.pose.position.z = 0.7;
+
+  pub_cartesian.publish(default_pose);
 
   // [Acquire stream and initialize displays]
   while (node_handle.ok()) {
