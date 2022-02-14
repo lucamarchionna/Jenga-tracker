@@ -251,6 +251,7 @@ class Yolact_pose_service():
     img_big[:,80:560]=img_all_masks.copy()
     img_big=cv2.drawFrameAxes(img_big,cam_mtx,cam_dist,rvec_est,tvec_est,0.03,thickness=2)
     img_all_masks=img_big[:,80:560].copy()
+    self.img_imshow=np.hstack((img,img_all_masks))
 
     print("Search from policy")
     # print("position:",tvec_est)
