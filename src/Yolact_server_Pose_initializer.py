@@ -156,9 +156,9 @@ class Yolact_pose_service():
     cam_mtx = np.array(cam_info.K).reshape([3, 3])
     cam_dist = np.array(cam_info.D)
     # %%
-    img_name=os.path.join(self.yolact_path,"input_images",str(time.time())+".png")
+    # img_name=os.path.join(self.yolact_path,"input_images",str(time.time())+".png")
     # print(img_name)
-    cv2.imwrite(img_name,color_image)
+    # cv2.imwrite(img_name,color_image)
 
     # %%
     ### CROP IMAGE TO BE SQUARE
