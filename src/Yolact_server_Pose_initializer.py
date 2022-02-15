@@ -155,10 +155,6 @@ class Yolact_pose_service():
     color_image=cv2.cvtColor(color_image,cv2.COLOR_RGB2BGR)
     cam_mtx = np.array(cam_info.K).reshape([3, 3])
     cam_dist = np.array(cam_info.D)
-    # %%
-    # img_name=os.path.join(self.yolact_path,"input_images",str(time.time())+".png")
-    # print(img_name)
-    # cv2.imwrite(img_name,color_image)
 
     # %%
     ### CROP IMAGE TO BE SQUARE
@@ -203,30 +199,9 @@ class Yolact_pose_service():
       block.compute_slopes(min_slope_h=2)
 
     # %%
-    # img_all_masks=np.zeros(img.shape,dtype=np.uint8)
-    # img_masks_idx=np.zeros(img.shape,dtype=np.uint8)
-    # for block in blocks_list:
-    #   img_all_masks+=block.draw_masked_single(img)
-    #   img_masks_idx+=block.draw_masked_single(img)
-    #   cv2.putText(img_masks_idx,str(block.idx),block.centroid,cv2.FONT_HERSHEY_COMPLEX,0.5,[0,0,255])
-
-    # %%
     img_all_masks=np.zeros(img.shape,dtype=np.uint8)
-    # img_masks_idx=np.zeros(img.shape,dtype=np.uint8)
     for block in blocks_list:
       img_all_masks+=block.draw_masked_approx(img)
-      # img_masks_idx+=block.draw_masked_approx(img)
-      # cv2.putText(img_masks_idx,str(block.idx),block.centroid,cv2.FONT_HERSHEY_COMPLEX,0.5,[0,0,255])
-
-    #Save image
-    # cv2.imwrite(img_name[:-4]+'_ALL'+img_name[-4:],img_all_masks)
-
-    # %%
-    # for block in blocks_list:
-    #     # DRAW STUFF
-    #     contouredAll_centroid_img=block.draw_contoursAll_centroid(img)
-    #     maskedSingle_approx=block.draw_masked_approx(img)
-    #     masked_corners=block.draw_corners(maskedSingle_approx)
 
     # %%
     if len(blocks_list)<0:
@@ -236,7 +211,6 @@ class Yolact_pose_service():
       ### LIST ALL GROUPS ###
       blocks_groups_list=[]
       for block in blocks_list:
-        #idx=range(3,len(blocks_list)-4)    #find between not top and not bottom floors, if they are ordered
         if block.block_type=='front_face':
           idx=block.idx
           blocks_group=Blocks_group(blocks_list,idx,img_all_masks)
@@ -295,44 +269,7 @@ class Yolact_pose_service():
         self.img_imshow=np.zeros((self.width,self.height*2,3),dtype=np.uint8)
         return to_PoseEstimationResponse("")
       if (k==ord('c')):
-        chosen_blocks_group=choice_group
-        # cv2.imwrite(img_name[:-3]+'-'+str(time.time())+img_name[-4:],self.img_imshow) 
-    # %%
-    # selected_group=False
-    # chosen_img=np.zeros((self.width,self.height*2,3),dtype=np.uint8)
-    # rospy.loginfo("\nChoose one group pressing 'c', pass pressing 'q', exit pressing 'esc'\n")
-    # while(not selected_group):
-    #   for random_block_group in blocks_groups_list:
-    #     masked_group=random_block_group.draw_masked_group(img)
-    #     img_test_points=random_block_group.get_drawn_search_img()
-    #     self.newImage=True # signal to the main that a new image is received
-    #     # self.img_imshow=np.hstack((img_all_masks,masked_group))
-    #     self.img_imshow=np.hstack((img_test_points,masked_group))
-    #     # print("Cases:",random_block_group.caseA,random_block_group.caseB,random_block_group.caseC,random_block_group.caseD)
-    #     while(self.keyFromWindow==0):
-    #       # Wait until key is chosen in the main loop
-    #       continue
-    #     else:
-    #       # rospy.loginfo("Received key: "+chr(self.keyFromWindow))
-    #       # get ready for next image 
-    #       k=self.keyFromWindow
-    #       self.keyFromWindow=0
-    #       ##
-    #       # exit if pressed 'esc'
-    #       ## WARNING: RETURN HERE ##
-    #       ##
-    #       if (k==27 and not selected_group):
-    #         rospy.loginfo("SERVICE HALTED BY USER")
-    #         self.img_imshow=np.zeros((self.width,self.height*2,3),dtype=np.uint8)
-    #         return to_PoseEstimationResponse("")
-    #       if (k==ord('c') and not selected_group):
-    #         chosen_blocks_group=random_block_group
-    #         selected_group=True
-    #         chosen_img=self.img_imshow
-    #         cv2.imwrite(img_name[:-3]+'-'+str(time.time())+img_name[-4:],self.img_imshow)
-
-    # self.img_imshow=chosen_img.copy()      
-    
+        chosen_blocks_group=choice_group    
     # %%
     # # Single block size and reference pose setup
     b_width=0.025
@@ -340,7 +277,6 @@ class Yolact_pose_service():
     b_length=0.075
 
     #to move object reference frame to desired new pose:
-
     zend_quat_o=np.quaternion(np.cos(np.pi/4),np.sin(np.pi/4), 0, 0)
     zend_Rot_o=quaternion.as_rotation_matrix(zend_quat_o)
     zend_t_o=np.array([-b_width/2,b_height/2,0])
