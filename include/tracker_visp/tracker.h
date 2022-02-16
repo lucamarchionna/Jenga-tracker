@@ -19,6 +19,8 @@
 #include <visp3/core/vpImageDraw.h>
 #include <visp3/core/vpFont.h>
 // TEMP
+#include <moveit/move_group_interface/move_group_interface.h>
+#include <moveit/planning_scene_interface/planning_scene_interface.h>
 
 #include "tf2_msgs/TFMessage.h"
 #include <geometry_msgs/TransformStamped.h>
@@ -75,8 +77,12 @@ class tracking
         vpDisplayOpenCV d1, d2, d3, d4;
         tracker_visp::YolactInitializeCaoPose srv;
 
+        static const string PLANNING_GROUP; 
+        moveit::planning_interface::MoveGroupInterface move_group_interface(string PLANNING_GROUP);
+        moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
+        moveit::planning_interface::MoveGroupInterface move_group{"edo"};
 
-        vpHomogeneousMatrix cMo, cTo, eeTc, eeTc1, wTee, depth_M_color, wTc, wTc1;;
+        vpHomogeneousMatrix cMo, cTo, eeTc, eeTc1, wTee, depth_M_color, wTc, wTc1, bTee;
 
         double opt_learn, opt_auto_init, opt_proj_error_threshold{25.0}, opt_setGoodME_thresh{0.4};
         int opt_disp_visibility{0}, width{640}, height{480}, fps{30};

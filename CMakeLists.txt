@@ -138,21 +138,21 @@ catkin_package(
 #   ${${PROJECT_NAME}_EXPORTED_TARGETS}
 # )
 
-# add_executable(detection
-#   src/tracker_params_class.cpp
-# )
+add_executable(detection
+  src/tracker_params_class.cpp
+)
 
-# target_link_libraries(detection
-#   ${catkin_LIBRARIES}
-#   ${VISP_LIBRARIES}
-#   ${realsense2_LIBRARY}
-#   ${PCL_LIBRARIES}
-# )
+target_link_libraries(detection
+  ${catkin_LIBRARIES}
+  ${VISP_LIBRARIES}
+  ${realsense2_LIBRARY}
+  ${PCL_LIBRARIES}
+)
 
-# add_dependencies(detection
-#   ${catkin_EXPORTED_TARGETS}
-#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
-# )
+add_dependencies(detection
+  ${catkin_EXPORTED_TARGETS}
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+)
 
 # add_executable(tracker_params
 #   src/tracker_params.cpp
