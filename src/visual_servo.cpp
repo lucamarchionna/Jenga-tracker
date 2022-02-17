@@ -26,7 +26,6 @@ visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh), s(vpFea
   for(int i=0;i<4 && node_handle.ok();i++){
     
     init_shortLoop();
-    init_matrices();
     ROS_INFO_STREAM("Continue loop");    
 
     learning_process();
@@ -438,7 +437,7 @@ void visual_servoing::init_shortLoop()
     mapOfImages["Camera1"] = &I_color;
     mapOfImages["Camera2"] = &I_depth_color;
     vpDisplay::display(I_color);
-    vpDisplay::displayText(I_color, 20, 20, "Left click: start init. Righ:quit", vpColor::red);
+    vpDisplay::displayText(I_color, 20, 20, "WAITING DETECTION...", vpColor::red);
     vpDisplay::flush(I_color);
     
     sensor_msgs::Image sensor_image = visp_bridge::toSensorMsgsImage(I_color);
@@ -538,9 +537,6 @@ void visual_servoing::reinit_vs() {
 }
 int visual_servoing::init_matrices() 
 { 
-  geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
-  static tf2_ros::StaticTransformBroadcaster br_static;
-  br_static.sendTransform(pose_target2);
 
   camTtarget = homogeneousTransformation("camera_color_optical_frame", "handeye_target2");
   targetTcam = homogeneousTransformation("handeye_target2", "camera_color_optical_frame");
@@ -787,6 +783,9 @@ void visual_servoing::learning_process()
       if (vpDisplay::getClick(I_color, button, false)) {
         if (button == vpMouseButton::button3) {
           quit = true;
+          geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
+          static tf2_ros::StaticTransformBroadcaster br_static;
+          br_static.sendTransform(pose_target2);          
           init_matrices();
           init_servo();
         }
