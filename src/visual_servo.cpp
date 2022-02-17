@@ -355,7 +355,7 @@ void visual_servoing::init_startLoop()
     realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, NULL, NULL);
 
     vpDisplay::display(I_color);
-    vpDisplay::displayText(I_color, 20, 20, "Click when ready.", vpColor::red);
+    vpDisplay::displayText(I_color, 20, 20, "BEFORE THE LOOP.", vpColor::red);
     vpDisplay::flush(I_color);
     if (vpDisplay::getClick(I_color, false))
       break;
@@ -405,28 +405,26 @@ void visual_servoing::init_shortLoop()
   pub_cartesian.publish(default_pose);
 
   // [Acquire stream and initialize displays]
-  // while (node_handle.ok()) {
-  //   realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, NULL, NULL);
+  while (node_handle.ok()) {
+    realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, NULL, NULL);
 
-  //   vpDisplay::display(I_color);
-  //   vpDisplay::displayText(I_color, 20, 20, "Click when ready.", vpColor::red);
-  //   vpDisplay::flush(I_color);
-  //   if (vpDisplay::getClick(I_color, false))
-  //     break;
+    vpDisplay::display(I_color);
+    vpDisplay::displayText(I_color, 20, 20, "LOOP START, Click when ready", vpColor::red);
+    vpDisplay::flush(I_color);
+    if (vpDisplay::getClick(I_color, false))
+      break;
 
-  //   vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
-  //   vpImageConvert::convert(I_depth_gray,I_depth_color);
-  //   vpDisplay::display(I_depth_color);
-  //   vpDisplay::displayText(I_depth_color, 20, 20, "Click when ready.", vpColor::red);
-  //   vpDisplay::flush(I_depth_color);
-  //   if (vpDisplay::getClick(I_depth_color, false))
-  //     break;
-  // }
+    vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
+    vpImageConvert::convert(I_depth_gray,I_depth_color);
+    vpDisplay::display(I_depth_color);
+    vpDisplay::displayText(I_depth_color, 20, 20, "Click when ready.", vpColor::red);
+    vpDisplay::flush(I_depth_color);
+    if (vpDisplay::getClick(I_depth_color, false))
+      break;
+  }
 
-  bool terminated = false;
   bool found_top = false;
-  vpMouseButton::vpMouseButtonType button;
-  while (!terminated && !found_top && node_handle.ok()) {
+  while (!found_top && node_handle.ok()) {
     try{
       realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, NULL, NULL);
     }
@@ -443,35 +441,28 @@ void visual_servoing::init_shortLoop()
     vpDisplay::displayText(I_color, 20, 20, "Left click: start init. Righ:quit", vpColor::red);
     vpDisplay::flush(I_color);
     
-    if (vpDisplay::getClick(I_color, button, false)) {
-      if(button == vpMouseButton::button1){
-        sensor_msgs::Image sensor_image = visp_bridge::toSensorMsgsImage(I_color);
-        sensor_msgs::CameraInfo sensor_camInfo = visp_bridge::toSensorMsgsCameraInfo(cam_color,width,height);
-        // Send image and cam par to service init
-        ROS_INFO("Subscribing to service...");
-        ros::service::waitForService("/RestartFirstLayer"); 
-        srv_init.request.image = sensor_image;
-        srv_init.request.camInfo = sensor_camInfo;
-        ROS_INFO("Starting call to service..");
-        if (client_init.call(srv_init))
-        {
-          ROS_INFO("Response from service..");
-          found_top=srv_init.response.found_top.data;
+    sensor_msgs::Image sensor_image = visp_bridge::toSensorMsgsImage(I_color);
+    sensor_msgs::CameraInfo sensor_camInfo = visp_bridge::toSensorMsgsCameraInfo(cam_color,width,height);
+    // Send image and cam par to service init
+    ROS_INFO("Subscribing to service...");
+    ros::service::waitForService("/RestartFirstLayer"); 
+    srv_init.request.image = sensor_image;
+    srv_init.request.camInfo = sensor_camInfo;
+    ROS_INFO("Starting call to service..");
+    if (client_init.call(srv_init))
+    {
+      ROS_INFO("Response from service..");
+      found_top=srv_init.response.found_top.data;
 
-          if (found_top){
-            cout << "Found top init" << endl; 
-          }
-          else {
-            ROS_INFO("Image discarded");
-          }
-        }
-        else{
-          ROS_ERROR("Cannot receive response from server");
-        }
+      if (found_top){
+        cout << "Found top init" << endl; 
       }
-      else if (button == vpMouseButton::button3){
-        terminated=true;
+      else {
+        ROS_INFO("Image discarded");
       }
+    }
+    else{
+      ROS_ERROR("Cannot receive response from server");
     }
   }
 
@@ -489,6 +480,7 @@ void visual_servoing::init_shortLoop()
 
   // Force good moving edges ratio threshold
   tracker->setGoodMovingEdgesRatioThreshold(opt_setGoodME_thresh);  //default=0.4
+  tracker->setDepthDenseFilteringMinDistance(0.3);
 
   // Remove faces with name "occluded" from the tracking, a priori
   tracker->setUseEdgeTracking("occluded",false);
@@ -629,8 +621,6 @@ void visual_servoing::learning_process()
 
   // [INITIALIZE WITH YOLACT]
   // [Acquire stream and initialize displays]
-  bool terminated = false;
-  vpMouseButton::vpMouseButtonType button;
   opt_model="";
   while (!terminated && (opt_model=="") && node_handle.ok()) {
     try{
@@ -649,44 +639,37 @@ void visual_servoing::learning_process()
     vpDisplay::displayText(I_color, 20, 20, "Left click: start service. Righ:quit", vpColor::red);
     vpDisplay::flush(I_color);
     
-    if (vpDisplay::getClick(I_color, button, false)) {
-      if(button == vpMouseButton::button1){
-        sensor_msgs::Image sensor_image = visp_bridge::toSensorMsgsImage(I_color);
-        sensor_msgs::CameraInfo sensor_camInfo = visp_bridge::toSensorMsgsCameraInfo(cam_color,width,height);
-        // Send image and cam par to service, where Python node responds with cao_file and pose
-        ROS_INFO("Subscribing to service...");
-        ros::service::waitForService("/YolactInitializeCaoPose"); 
-        srv_cao.request.image = sensor_image;
-        srv_cao.request.camInfo = sensor_camInfo;
-        ROS_INFO("Starting call to service..");
-        if (client_cao.call(srv_cao))
-        {
-          ROS_INFO("Response from service..");
-          opt_model=srv_cao.response.caoFilePath.data;
+    sensor_msgs::Image sensor_image = visp_bridge::toSensorMsgsImage(I_color);
+    sensor_msgs::CameraInfo sensor_camInfo = visp_bridge::toSensorMsgsCameraInfo(cam_color,width,height);
+    // Send image and cam par to service, where Python node responds with cao_file and pose
+    ROS_INFO("Subscribing to service...");
+    ros::service::waitForService("/YolactInitializeCaoPose"); 
+    srv_cao.request.image = sensor_image;
+    srv_cao.request.camInfo = sensor_camInfo;
+    ROS_INFO("Starting call to service..");
+    if (client_cao.call(srv_cao))
+    {
+      ROS_INFO("Response from service..");
+      opt_model=srv_cao.response.caoFilePath.data;
 
-          if (opt_model!=""){
-            block_choice = srv_cao.response.initPose.location;
+      if (opt_model!=""){
+        block_choice = srv_cao.response.initPose.location;
 
-            cout << "The chosen block is " << block_choice << endl; 
+        cout << "The chosen block is " << block_choice << endl; 
 
-            geometry_msgs::Pose initPose=srv_cao.response.initPose.pose.pose;
-            cMo=visp_bridge::toVispHomogeneousMatrix(initPose);	//object pose cMo
-            tracker->loadModel(opt_model, opt_model);
-            mapOfCameraPoses["Camera1"] = cMo;
-            mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
-            tracker->initFromPose(mapOfImages,mapOfCameraPoses);
-          }
-          else {
-            ROS_INFO("Image discarded");
-          }
-        }
-        else{
-          ROS_ERROR("Cannot receive response from server");
-        }
+        geometry_msgs::Pose initPose=srv_cao.response.initPose.pose.pose;
+        cMo=visp_bridge::toVispHomogeneousMatrix(initPose);	//object pose cMo
+        tracker->loadModel(opt_model, opt_model);
+        mapOfCameraPoses["Camera1"] = cMo;
+        mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
+        tracker->initFromPose(mapOfImages,mapOfCameraPoses);
       }
-      else if (button == vpMouseButton::button3){
-        terminated=true;
+      else {
+        ROS_INFO("Image discarded");
       }
+    }
+    else{
+      ROS_ERROR("Cannot receive response from server");
     }
   }
 
@@ -1017,6 +1000,10 @@ void visual_servoing::detection_process()
           run_auto_init = false;
         }
         tracker->track(mapOfImages, mapOfPointclouds, mapOfWidths, mapOfHeights);
+        catch (const std::length_error& le){
+          std::cerr << "Length error: " << le.what() << '\n';
+          run_auto_init = true;
+        }        
       } catch (const vpException &e) {
         std::cout << "Tracker exception: " << e.getStringMessage() << std::endl;
         tracking_failed = true;

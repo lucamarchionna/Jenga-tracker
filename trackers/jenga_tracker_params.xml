@@ -6,7 +6,7 @@
       <nb_mask>180</nb_mask>
     </mask>
     <range>
-      <tracking>5</tracking>
+      <tracking>8</tracking>
     </range>
     <contrast>
       <edge_threshold>10000</edge_threshold>
@@ -27,6 +27,12 @@
     <size_block>3</size_block> 
     <pyramid_lvl>3</pyramid_lvl> 
   </klt>
+  <depth_dense>
+    <sampling_step>
+      <step_X>4</step_X>
+      <step_Y>4</step_Y>
+    </sampling_step>
+  </depth_dense>  
   <camera>
     <!-- If tracker-live, parameters are read from intrinsic file instead -->
     <!--Projection model type-->
@@ -43,15 +49,15 @@
     <kdu>-0.08649131805040268</kdu>
   </camera>
   <face>
-    <angle_appear>75</angle_appear> 
-    <angle_disappear>80</angle_disappear> 
+    <angle_appear>85</angle_appear> 
+    <angle_disappear>90</angle_disappear> 
     <near_clipping>0.01</near_clipping>
     <far_clipping>1.5</far_clipping>
     <fov_clipping>0</fov_clipping>
   </face>
   <lod>
     <!-- General lod parameters, may be overwritten by .cao model -->
-    <use_lod>1</use_lod>
+    <use_lod>0</use_lod>
     <min_line_length_threshold>100</min_line_length_threshold>
     <min_polygon_area_threshold>300</min_polygon_area_threshold>
   </lod>
