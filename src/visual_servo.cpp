@@ -466,6 +466,8 @@ void visual_servoing::init_shortLoop()
     }
   }
 
+  pub_cartesian.publish(default_pose);
+
   tracker = new vpMbGenericTracker(trackerTypes);
   
   tracker->loadConfigFile(opt_config, opt_config);
