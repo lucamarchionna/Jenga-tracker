@@ -801,8 +801,6 @@ void visual_servoing::learning_process()
       if (vpDisplay::getClick(I_color, button, false)) {
         if (button == vpMouseButton::button3) {
           quit = true;
-          geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
-          br_static.sendTransform(pose_target2);
           init_matrices();
           init_servo();
         }
