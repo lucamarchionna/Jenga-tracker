@@ -6,7 +6,7 @@
       <nb_mask>180</nb_mask>
     </mask>
     <range>
-      <tracking>8</tracking>
+      <tracking>6</tracking>
     </range>
     <contrast>
       <edge_threshold>10000</edge_threshold>
@@ -49,8 +49,8 @@
     <kdu>-0.08649131805040268</kdu>
   </camera>
   <face>
-    <angle_appear>85</angle_appear> 
-    <angle_disappear>90</angle_disappear> 
+    <angle_appear>80</angle_appear> 
+    <angle_disappear>80</angle_disappear> 
     <near_clipping>0.01</near_clipping>
     <far_clipping>1.5</far_clipping>
     <fov_clipping>0</fov_clipping>
@@ -58,8 +58,8 @@
   <lod>
     <!-- General lod parameters, may be overwritten by .cao model -->
     <use_lod>0</use_lod>
-    <min_line_length_threshold>100</min_line_length_threshold>
-    <min_polygon_area_threshold>300</min_polygon_area_threshold>
+    <!-- <min_line_length_threshold>100</min_line_length_threshold>
+    <min_polygon_area_threshold>300</min_polygon_area_threshold> -->
   </lod>
 </conf>
 
