@@ -624,7 +624,7 @@ void visual_servoing::learning_process()
   // [INITIALIZE WITH YOLACT]
   // [Acquire stream and initialize displays]
   opt_model="";
-  while (!terminated && (opt_model=="") && node_handle.ok()) {
+  while ((opt_model=="") && node_handle.ok()) {
     try{
       realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, NULL, NULL);
     }
