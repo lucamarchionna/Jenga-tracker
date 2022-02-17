@@ -720,7 +720,29 @@ void visual_servoing::learning_process()
         }
       }
 
+      //Rotating base
+      if (!rotated && !tracking_failed) {
+        ros::Duration(2.0).sleep();
 
+      // Run auto initialization from learned data
+        if ((opt_auto_init && keypoint.matchPoint(I_gray, cam_color, cMo)) || opt_yolact_init) {
+
+        // SERVO SEND ANGLE
+          vpThetaUVector cTo_tu = cMo.getThetaUVector();
+          tracker_visp::angle_velocity angleVel_to_servo;
+          angleVel_to_servo.velocity = 0.01; //degrees/ms, velocity slow
+          // std::cout << "Theta: \n" << angle << std::endl;
+          if (cTo_tu[1]<0){	//radians, "right face seen from camera"
+            angleVel_to_servo.angle = 130;	//degrees, final angle
+            servoPub.publish(angleVel_to_servo);
+          }
+          else {	//radians, "left face seen from camera"
+            angleVel_to_servo.angle = 50;	//degrees, final angle
+            servoPub.publish(angleVel_to_servo);
+          } 
+        }
+        rotated = true;
+      }
       // Define camera's RF
       
       vpTranslationVector t_cam; t_cam << 0.54, 0.08, 0.4;
@@ -802,6 +824,8 @@ void visual_servoing::learning_process()
       if (vpDisplay::getClick(I_color, button, false)) {
         if (button == vpMouseButton::button3) {
           quit = true;
+          geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
+          br_static.sendTransform(pose_target2);
           init_matrices();
           init_servo();
         }
@@ -1060,28 +1084,6 @@ void visual_servoing::detection_process()
       }
 
 
-      //Rotating base
-      if (!rotated && !tracking_failed) {
-
-      // Run auto initialization from learned data
-        if ((opt_auto_init && keypoint.matchPoint(I_gray, cam_color, cMo)) || opt_yolact_init) {
-
-        // SERVO SEND ANGLE
-          vpThetaUVector cTo_tu = cMo.getThetaUVector();
-          tracker_visp::angle_velocity angleVel_to_servo;
-          angleVel_to_servo.velocity = 0.01; //degrees/ms, velocity slow
-          // std::cout << "Theta: \n" << angle << std::endl;
-          if (cTo_tu[1]<0){	//radians, "right face seen from camera"
-            angleVel_to_servo.angle = 130;	//degrees, final angle
-            servoPub.publish(angleVel_to_servo);
-          }
-          else {	//radians, "left face seen from camera"
-            angleVel_to_servo.angle = 50;	//degrees, final angle
-            servoPub.publish(angleVel_to_servo);
-          } 
-        }
-        rotated = true;
-      }
 
       // Get and publish object pose
       cMo = tracker->getPose();
@@ -1208,7 +1210,7 @@ void visual_servoing::detection_process()
     //! [END OF LOOP]
     tracker_visp::angle_velocity angleVel_to_servo;
     angleVel_to_servo.angle = 90;	//degrees, setup angle
-    angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
+    angleVel_to_servo.velocity = 0.003; //degrees/ms, velocity fast
     servoPub.publish(angleVel_to_servo);
 
     if (!times_vec.empty()) {
