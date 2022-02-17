@@ -26,6 +26,7 @@
 #include <boost/bind.hpp>
 
 #include "tracker_visp/YolactInitializeCaoPose.h"
+#include "tracker_visp/RestartFirstLayer.h"
 #include "tracker_visp/ForceBasedDecision.h"
 #include "tracker_visp/location.h"
 #include "tracker_visp/ReferenceBlock.h"
@@ -98,7 +99,7 @@ class visual_servoing
         ros::Subscriber subLearning; 
         ros::Publisher trackerEstimation;
         ros::Publisher servoPub;
-        ros::ServiceClient client, client_force;
+        ros::ServiceClient client_cao,client_init, client_force;
         string tracker_path, opt_config, opt_model, opt_init, opt_init_pos, opt_learning_data, opt_keypoint_config; 
 
         static const string PLANNING_GROUP; 
@@ -112,8 +113,8 @@ class visual_servoing
         ros::Time t;
         rs2::config config;
         vpDisplayOpenCV d1, d2, d3, d4;
-        tracker_visp::YolactInitializeCaoPose srv;
-
+        tracker_visp::YolactInitializeCaoPose srv_cao;
+        tracker_visp::RestartFirstLayer srv_init;
 
         vpHomogeneousMatrix cMo, cTo, eeTc, eeTc1, wTee, depth_M_color, wTc, wTc1, eeTcam, baseTee, eeTtarget, baseTtarget, targetTcam, cam_desTtarget, camTtarget, cdTc, offset, cdTtarget, camTee, camTbase, bTee;
 
