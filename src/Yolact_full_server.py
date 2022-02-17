@@ -593,24 +593,23 @@ if __name__ == "__main__":
   cv2.namedWindow(yolact_object.pose_window_name)
   try:
     while(not rospy.is_shutdown()):
-      kinit=0 #to enter in the loop
-      # stay in the loop until q or c is pressed
-      while (kinit!=ord('c') and kinit!=27 and not rospy.is_shutdown()):
-        cv2.imshow(yolact_object.init_window_name,yolact_object.first_imshow) #imshow in the main, on the concurrent image
-        kinit=cv2.waitKey(10) #red key in the image window
-      kpose=0 #to enter in the loop
-      # stay in the loop until c or esc is pressed
-      while (kpose!=ord('c') and kpose!=27 and not rospy.is_shutdown()):
-        cv2.imshow(yolact_object.pose_window_name,yolact_object.pose_imshow) #imshow in the main, on the concurrent image
-        kpose=cv2.waitKey(10) #red key in the image window
-  
       # now a key has been pressed
       # pass the key only if a new image has been received
       if yolact_object.in_pose_service:
+        kinit=0 #to enter in the loop
+        # stay in the loop until q or c is pressed
+        while (kinit!=ord('c') and kinit!=27 and not rospy.is_shutdown()):
+          cv2.imshow(yolact_object.init_window_name,yolact_object.first_imshow) #imshow in the main, on the concurrent image
+          kinit=cv2.waitKey(10) #red key in the image window        
         if (yolact_object.newImage and not rospy.is_shutdown()):
             yolact_object.keyFromWindow=kinit
             yolact_object.newImage=False  #return waiting for a new image
       elif yolact_object.in_init_service:
+        kpose=0 #to enter in the loop
+        # stay in the loop until c or esc is pressed
+        while (kpose!=ord('c') and kpose!=27 and not rospy.is_shutdown()):
+          cv2.imshow(yolact_object.pose_window_name,yolact_object.pose_imshow) #imshow in the main, on the concurrent image
+          kpose=cv2.waitKey(10) #red key in the image window        
         if (yolact_object.newImage and not rospy.is_shutdown()):
           yolact_object.keyFromWindow=kpose
           yolact_object.newImage=False  #return waiting for a new image
