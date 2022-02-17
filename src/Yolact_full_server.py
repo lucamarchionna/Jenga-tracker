@@ -512,7 +512,7 @@ class Yolact_full_service():
     
     #No blocks found in projection
     if not policy_found:
-      self.newImage=True # signal to the main that a new image is received
+      self.newImage=False # signal to the main that a new image is received
       img_zero=np.zeros(img_all_masks.shape,dtype=np.uint8)
       self.pose_imshow=np.hstack((img_all_masks,img_zero))
       self.keyFromWindow=0
