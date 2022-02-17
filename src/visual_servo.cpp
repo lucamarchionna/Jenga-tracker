@@ -20,8 +20,8 @@ visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh), s(vpFea
   subForce = node_handle.subscribe("/retract", 1, &visual_servoing::forceCallback, this);
   // To wait a bit before publishing to /servo
   ros::Duration(1.0).sleep();
-  init_startLoop();
-  ROS_INFO_STREAM("Start loop");
+  init_parameters();
+  learning_process();
 
   for(int i=0;i<4 && node_handle.ok();i++){
     
@@ -35,13 +35,8 @@ visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh), s(vpFea
     ros::Duration(1.0).sleep();
 
     detection_process();
-    ROS_INFO_STREAM("Detection process finished");
-    ros::Duration(1.0).sleep();
 
-    delete tracker;
-    take_cTo=true;
-  }  
-}
+  }
 
 void visual_servoing::estimationCallback(const geometry_msgs::Pose& tracker_pose_P) 
 {
@@ -292,8 +287,12 @@ void visual_servoing::learningCallback(const std_msgs::Bool::ConstPtr& msg)
   learn_position=msg->data;
 }
 
-void visual_servoing::init_startLoop()
+void visual_servoing::init_parameters()
 {
+  tracker_visp::angle_velocity angleVel_to_servo;
+  angleVel_to_servo.angle = 90;	//degrees, setup angle
+  angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
+  servoPub.publish(angleVel_to_servo);
   //Settings  
   tracker_path = ros::package::getPath("tracker_visp");
   opt_config = tracker_path + "/trackers/jenga_tracker_params.xml";
@@ -398,8 +397,7 @@ void visual_servoing::init_shortLoop()
   geometry_msgs::PoseStamped default_pose;
   default_pose.pose.position.x = 0.1;
   default_pose.pose.position.z = 0.7;
-
-
+  pub_cartesian.publish(default_pose);
 
   // [Acquire stream and initialize displays]
   // while (node_handle.ok()) {
@@ -541,10 +539,9 @@ void visual_servoing::reinit_vs() {
 }
 int visual_servoing::init_matrices() 
 { 
-  geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
-  static tf2_ros::StaticTransformBroadcaster br_static;
-  br_static.sendTransform(pose_target2);
-
+  static const std::string PLANNING_GROUP = "edo";
+  moveit::planning_interface::MoveGroupInterface move_group_interface(PLANNING_GROUP);
+  moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
   camTtarget = homogeneousTransformation("camera_color_optical_frame", "handeye_target2");
   targetTcam = homogeneousTransformation("handeye_target2", "camera_color_optical_frame");
   baseTtarget = homogeneousTransformation("edo_base_link", "handeye_target2");
@@ -579,13 +576,19 @@ int visual_servoing::init_matrices()
 
 void visual_servoing::init_servo()
 {
-  //TODO:
+  //Task details
+  task.setServo(vpServo::EYEINHAND_CAMERA); //control law
+  task.setInteractionMatrixType(vpServo::CURRENT); //interaction matrix $\bf L$ is computed from the visual features at the desired position
+  
+  const vpAdaptiveGain lambda(1.4, 0.6, 30);
+  task.setLambda(lambda);
+
   //s = new vpFeatureTranslation(vpFeatureTranslation::cMo); alternativa con puntatore
   //PBVS
   s.buildFrom(camTtarget);
   s_star.buildFrom(cdTtarget);
-
   s_tu.buildFrom(cdTc);
+  
   if (firstAddFeatures){
     task.addFeature(s, s_star);
     task.addFeature(s_tu, s_tu_star); //, vpFeatureThetaU::selectTUy() | vpFeatureThetaU::selectTUx());
@@ -612,7 +615,6 @@ void visual_servoing::learning_process()
   mapOfImages["Camera1"] = &I_color;
   mapOfImages["Camera2"] = &I_depth_color;
 
-  // Check existence of keypoint configuration
   if (vpIoTools::checkFilename(opt_keypoint_config)){
     keypoint.loadConfigFile(opt_keypoint_config);
   }
@@ -726,6 +728,9 @@ void visual_servoing::learning_process()
 
       mapOfImages["Camera1"] = &I_color;
       mapOfPointclouds["Camera2"] = &pointcloud;
+      mapOfWidths["Camera2"] = width;
+      mapOfHeights["Camera2"] = height;
+
 
       // Run the tracker
       try {
@@ -756,7 +761,12 @@ void visual_servoing::learning_process()
       trackerEstimation.publish(cTo_P);
 
       // Check tracking errors
-      double proj_error = tracker->getProjectionError();
+      double proj_error = 0;
+      if (tracker->getTrackerType() & vpMbGenericTracker::EDGE_TRACKER) {
+        // Check tracking errors
+        proj_error = tracker->getProjectionError();
+      }
+
       if (proj_error > opt_proj_error_threshold) {
         std::cout << "Tracker needs to restart (projection error detected: " << proj_error << ")" << std::endl;
         tracking_failed = true;
@@ -788,12 +798,13 @@ void visual_servoing::learning_process()
         // Display frames
         vpDisplay::displayFrame(I_color, cMo, cam_color, 0.05, vpColor::none, 3);
         vpDisplay::displayFrame(I_depth_color, depth_M_color*cMo, cam_depth, 0.05, vpColor::none, 3);
+
       }
 
       vpMouseButton::vpMouseButtonType button;
       
-      // Show images updated
       vpDisplay::flush(I_color);
+
       vpDisplay::flush(I_depth_color);
 
       if (vpDisplay::getClick(I_color, button, false)) {
@@ -802,6 +813,7 @@ void visual_servoing::learning_process()
           init_matrices();
           init_servo();
         }
+
         else if (button == vpMouseButton::button1)
           learn_position = true;
       }
@@ -813,6 +825,7 @@ void visual_servoing::learning_process()
 
       //Rotating base to learn from it
       if (!rotated && !tracking_failed) {
+        ros::Duration(2.0).sleep();        
 
       // SERVO SEND ANGLE
         vpThetaUVector cTo_tu = cMo.getThetaUVector();
@@ -828,7 +841,7 @@ void visual_servoing::learning_process()
         } 
         rotated = true;
       }
-
+      
       if (learn_position) {
         double train_t = vpTime::measureTimeMs();
 
@@ -878,14 +891,17 @@ void visual_servoing::learning_process()
 
     //! -----------------------------------------------------------------------------------------------
     //! [END OF LOOP]
-
-    //Close display of learned
     d3.close(ILearned);
 
     // Terminate learning phase, save all on exit
-    if (learn_cpt>0){
+    if (opt_learn) {
+      
+      if (learn_cpt>0){
         std::cout << "Save learning from " << learn_cpt << " images in file: " << opt_learning_data << std::endl;
         keypoint.saveLearningData(opt_learning_data, true, true);
+    }
+
+    
     }
 
     if (!times_vec.empty()) {
@@ -896,10 +912,15 @@ void visual_servoing::learning_process()
     std::cout << "\nTrain:\nProcessing time, Mean: " << vpMath::getMean(train_t_vec) << " ms ; Median: " << vpMath::getMedian(train_t_vec)
               << " ; Std: " << vpMath::getStdev(train_t_vec) << " ms" << std::endl;
     }
+    if (!detect_t_vec.empty()) {
+    std::cout << "\nDetection:\nProcessing time, Mean: " << vpMath::getMean(detect_t_vec) << " ms ; Median: " << vpMath::getMedian(detect_t_vec)
+              << " ; Std: " << vpMath::getStdev(detect_t_vec) << " ms" << std::endl;
+    }
   
   } catch (const vpException &e) {
     std::cout << "Catch an exception: " << e.what() << std::endl;
   }
+
 }
 
 
@@ -913,6 +934,7 @@ void visual_servoing::detection_process()
     ROS_ERROR("Could not find learning file");
     return;
   }
+
   vpImageConvert::convert(I_color,I_gray);
   keypoint.createImageMatching(I_gray, IMatching);
   d3.setDownScalingFactor(vpDisplay::SCALE_AUTO);
@@ -932,7 +954,7 @@ void visual_servoing::detection_process()
   tracker->setGoodMovingEdgesRatioThreshold(opt_setGoodME_thresh);  //default=0.4
 
   // Before the loop
-  bool run_auto_init =true;
+  bool run_auto_init = true;
 
   std::vector<double> times_vec;
   std::vector<double> detect_t_vec;
@@ -941,8 +963,6 @@ void visual_servoing::detection_process()
     double loop_t = 0;
     
     bool quit = false;
-    static tf2_ros::TransformBroadcaster br;
-    static tf2_ros::StaticTransformBroadcaster br_static;
 
     // Define camera's RF for girst initialization
     wTc = homogeneousTransformation("world", "camera_color_optical_frame");
@@ -970,6 +990,8 @@ void visual_servoing::detection_process()
 
       mapOfImages["Camera1"] = &I_color;
       mapOfPointclouds["Camera2"] = &pointcloud;
+      mapOfWidths["Camera2"] = width;
+      mapOfHeights["Camera2"] = height;
 
       // Run auto initialization from learned data
       if (run_auto_init) {
@@ -1076,8 +1098,14 @@ void visual_servoing::detection_process()
 
       }
       
+
       // Check tracking errors
-      double proj_error = tracker->getProjectionError();
+      double proj_error = 0;
+      if (tracker->getTrackerType() & vpMbGenericTracker::EDGE_TRACKER) {
+        // Check tracking errors
+        proj_error = tracker->getProjectionError();
+      }
+
       if (proj_error > opt_proj_error_threshold) {
         std::cout << "Tracker needs to restart (projection error detected: " << proj_error << ")" << std::endl;
         run_auto_init = true;
@@ -1115,8 +1143,8 @@ void visual_servoing::detection_process()
 
       vpMouseButton::vpMouseButtonType button;
       
-      // Update new images display
       vpDisplay::flush(I_color);
+
       vpDisplay::flush(I_depth_color);
 
       if (vpDisplay::getClick(I_color, button, false)) {
@@ -1135,14 +1163,9 @@ void visual_servoing::detection_process()
 
     //! -----------------------------------------------------------------------------------------------
     //! [END OF LOOP]
-
-    //Close display of matching
-    d3.close(IMatching);
-
-    // Rotate tower back in place
     tracker_visp::angle_velocity angleVel_to_servo;
     angleVel_to_servo.angle = 90;	//degrees, setup angle
-    angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
+    angleVel_to_servo.velocity = 0.003; //degrees/ms, velocity fast
     servoPub.publish(angleVel_to_servo);
 
     if (!times_vec.empty()) {
