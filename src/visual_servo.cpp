@@ -1001,12 +1001,13 @@ void visual_servoing::detection_process()
           tracker->setDisplayFeatures(false);
           run_auto_init = false;
         }
-        tracker->track(mapOfImages, mapOfPointclouds, mapOfWidths, mapOfHeights);
-        catch (const std::length_error& le){
-          std::cerr << "Length error: " << le.what() << '\n';
-          run_auto_init = true;
-        }        
-      } catch (const vpException &e) {
+        tracker->track(mapOfImages, mapOfPointclouds, mapOfWidths, mapOfHeights);     
+      } 
+      catch (const std::length_error& le){
+        std::cerr << "Length error: " << le.what() << '\n';
+        run_auto_init = true;
+        }   
+      catch (const vpException &e) {
         std::cout << "Tracker exception: " << e.getStringMessage() << std::endl;
         tracking_failed = true;
         run_auto_init = true;
