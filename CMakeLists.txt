@@ -47,6 +47,7 @@ add_service_files(
   FILES
   YolactInitializeCaoPose.srv
   FirstLayerPose.srv
+  RestartFirstLayer.srv
   PoseEstimation.srv
   BlockEstimation.srv
   ForceBasedDecision.srv
