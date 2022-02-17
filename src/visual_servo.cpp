@@ -491,6 +491,8 @@ void visual_servoing::init_shortLoop()
   retract = false;
   f_max = false;
   run_completed = false;
+
+  rotated=false;
 }
 
 void visual_servoing::reinit_vs() {
