@@ -196,51 +196,6 @@ def blockEst_from_location(block_location):
 
   return cTtarget_block
       
-  # def homogeneus_T_product(hom_T,vector):
-  #   hom_vector=np.zeros(4)
-  #   hom_vector[:3]=vector
-  #   hom_vector[3]=1
-  #   hom_product=hom_T@hom_vector
-  #   return hom_product[:3]
-
-  # def toHomogeneousMatrix(pose):
-
-  #   matrix=np.eye(4, dtype=float)
-
-  #   q0 = pose.orientation.w 
-  #   q1 = pose.orientation.x
-  #   q2 = pose.orientation.y
-  #   q3 = pose.orientation.z
-
-  #   q = np.ones(4)
-  #   q = [q0, q1, q2, q3]
-  #   norm = np.linalg.norm(q)
-
-  #   q0 = q0 / norm
-  #   q1 = q1 / norm
-  #   q2 = q2 / norm
-  #   q3 = q3 / norm
-
-  #   matrix[0][3] = pose.position.x
-  #   matrix[1][3] = pose.position.y
-  #   matrix[2][3] = pose.position.z
-
-  #   rot_matrix=np.array([ 
-  #       [q0**2+q1**2-q2**2-q3**2, 2*(q1*q2-q0*q3), 2*(q1*q3+q0*q2)], 
-  #       [2*(q1*q2+q0*q3), q0**2-q1**2+q2**2-q3**2, 2*(q2*q3-q0*q1)],
-  #       [2*(q1*q3-q0*q2), 2*(q2*q3+q0*q1), q0**2-q1**2-q2**2+q3**2]
-  #   ])
-
-
-  #   matrix[0:3, 0:3]=rot_matrix
-
-  #   return matrix    
-
-  # cTo_homog=toHomogeneousMatrix(cT_first.pose.pose)
-
-  # target_position=homogeneus_T_product(cTo_homog,transl)
-  # target_orientation=
-
 def First_service_handle(req):
   global search_top
   global search_bottom
@@ -258,12 +213,6 @@ def First_service_handle(req):
     search_top=False
     search_bottom=True
     cT_first=copy(cTlayer1)
-  #   print("Found top, searching bottom")
-  # elif search_bottom and found_bottom:
-  #   ready.data=False
-  #   search_top=False
-  #   search_bottom=False
-  #   print("Found top and then bottom, Finish")
   else:
     ready.data=True
   return ready
