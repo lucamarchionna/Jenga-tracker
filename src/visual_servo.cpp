@@ -290,7 +290,6 @@ geometry_msgs::TransformStamped visual_servoing::toMoveit(vpHomogeneousMatrix da
 void visual_servoing::learningCallback(const std_msgs::Bool::ConstPtr& msg)
 { 
   learn_position=msg->data;
-
 }
 
 void visual_servoing::init_startLoop()
@@ -702,7 +701,6 @@ void visual_servoing::learning_process()
     
     bool quit = false;
     static tf2_ros::TransformBroadcaster br;
-    static tf2_ros::StaticTransformBroadcaster br_static;
     // Define camera's RF for girst initialization
     wTc = homogeneousTransformation("world", "camera_color_optical_frame");
     vpTranslationVector t1; t1 << 0.0,0, 0;
@@ -888,7 +886,7 @@ void visual_servoing::learning_process()
     if (learn_cpt>0){
         std::cout << "Save learning from " << learn_cpt << " images in file: " << opt_learning_data << std::endl;
         keypoint.saveLearningData(opt_learning_data, true, true);
-      }
+    }
 
     if (!times_vec.empty()) {
     std::cout << "\nProcessing time, Mean: " << vpMath::getMean(times_vec) << " ms ; Median: " << vpMath::getMedian(times_vec)
