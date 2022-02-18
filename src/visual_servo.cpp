@@ -529,7 +529,7 @@ void visual_servoing::reinit_vs() {
   s_star.buildFrom(cdTtarget);
 
   s_tu.buildFrom(cdTc);
-
+task.setServo(vpServo::EYEINHAND_CAMERA);
   error = 5;
   threshold = 0.00002;
   block_axis = false;
@@ -719,8 +719,15 @@ void visual_servoing::learning_process()
       }
 
       // Get object pose
-      cMo = tracker->getPose();
+      if (!tracking_failed) {
+        cMo = tracker->getPose();
+        cMo_old = cMo;
+      }
 
+      else {
+        cMo = cMo_old;
+      }
+        
       // Publish object pose
       geometry_msgs::Pose forward_IK = move_group.getCurrentPose("edo_link_ee").pose;
       bTee = visp_bridge::toVispHomogeneousMatrix(forward_IK); 
@@ -783,9 +790,12 @@ void visual_servoing::learning_process()
       if (vpDisplay::getClick(I_color, button, false)) {
         if (button == vpMouseButton::button3) {
           quit = true;
-          geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
-          static tf2_ros::StaticTransformBroadcaster br_static;
-          br_static.sendTransform(pose_target2);          
+          if (!tracking_failed) {
+            geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
+            static tf2_ros::StaticTransformBroadcaster br_static;
+            br_static.sendTransform(pose_target2);  
+          }
+       
           init_matrices();
           init_servo();
         }
@@ -806,7 +816,7 @@ void visual_servoing::learning_process()
       // SERVO SEND ANGLE
         vpThetaUVector cTo_tu = cMo.getThetaUVector();
         tracker_visp::angle_velocity angleVel_to_servo;
-        angleVel_to_servo.velocity = 0.01; //degrees/ms, velocity slow
+        angleVel_to_servo.velocity = 0.003; //degrees/ms, velocity slow
         if (cTo_tu[1]<0){	//radians, "right face seen from camera"
           angleVel_to_servo.angle = 130;	//degrees, final angle
           servoPub.publish(angleVel_to_servo);
@@ -816,6 +826,9 @@ void visual_servoing::learning_process()
           servoPub.publish(angleVel_to_servo);
         } 
         rotated = true;
+        geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2"); //initial estimation
+        static tf2_ros::StaticTransformBroadcaster br_static;
+        br_static.sendTransform(pose_target2);  
       }
       
       if (learn_position) {
@@ -1014,7 +1027,15 @@ void visual_servoing::detection_process()
       }
 
       // Get and publish object pose
-      cMo = tracker->getPose();
+      // Get object pose
+      if (!tracking_failed) {
+        cMo = tracker->getPose();
+        cMo_old = cMo;
+      }
+
+      else {
+        cMo = cMo_old;
+      }
 
       geometry_msgs::Pose forward_IK = move_group.getCurrentPose("edo_link_ee").pose;
       bTee = visp_bridge::toVispHomogeneousMatrix(forward_IK); 

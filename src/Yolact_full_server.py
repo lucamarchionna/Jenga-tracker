@@ -595,7 +595,7 @@ if __name__ == "__main__":
     while(not rospy.is_shutdown()):
       # now a key has been pressed
       # pass the key only if a new image has been received
-      if yolact_object.in_pose_service:
+      if yolact_object.in_init_service:
         kinit=0 #to enter in the loop
         # stay in the loop until q or c is pressed
         while (kinit!=ord('c') and kinit!=27 and not rospy.is_shutdown()):
@@ -604,7 +604,7 @@ if __name__ == "__main__":
         if (yolact_object.newImage and not rospy.is_shutdown()):
             yolact_object.keyFromWindow=kinit
             yolact_object.newImage=False  #return waiting for a new image
-      elif yolact_object.in_init_service:
+      elif yolact_object.in_pose_service:
         kpose=0 #to enter in the loop
         # stay in the loop until c or esc is pressed
         while (kpose!=ord('c') and kpose!=27 and not rospy.is_shutdown()):

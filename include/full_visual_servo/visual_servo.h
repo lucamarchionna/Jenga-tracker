@@ -116,7 +116,7 @@ class visual_servoing
         tracker_visp::YolactInitializeCaoPose srv_cao;
         tracker_visp::RestartFirstLayer srv_init;
 
-        vpHomogeneousMatrix cMo, cTo, eeTc, eeTc1, wTee, depth_M_color, wTc, wTc1, eeTcam, baseTee, eeTtarget, baseTtarget, targetTcam, cam_desTtarget, camTtarget, cdTc, offset, cdTtarget, camTee, camTbase, bTee;
+        vpHomogeneousMatrix cMo, cMo_old, cTo, eeTc, eeTc1, wTee, depth_M_color, wTc, wTc1, eeTcam, baseTee, eeTtarget, baseTtarget, targetTcam, cam_desTtarget, camTtarget, cdTc, offset, cdTtarget, camTee, camTbase, bTee;
 
         geometry_msgs::PoseStamped initialGuestPos;
         geometry_msgs::Pose lastPoseReceived;

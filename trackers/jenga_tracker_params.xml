@@ -6,7 +6,7 @@
       <nb_mask>180</nb_mask>
     </mask>
     <range>
-      <tracking>6</tracking>
+      <tracking>5</tracking>
     </range>
     <contrast>
       <edge_threshold>10000</edge_threshold>
@@ -19,9 +19,9 @@
   </ecm>
   <klt>
     <mask_border>5</mask_border> 
-    <max_features>300</max_features> 
+    <max_features>500</max_features> 
     <window_size>5</window_size> 
-    <quality>0.015</quality> 
+    <quality>0.02</quality> 
     <min_distance>8</min_distance> 
     <harris>0.01</harris>
     <size_block>3</size_block> 
