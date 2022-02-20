@@ -4,6 +4,7 @@
 yolact_cpu
 src/__pycache__/*
 learning/
+!learning/keypoint_config.xml
 .vscode
 build
 model/
