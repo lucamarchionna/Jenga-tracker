@@ -1,6 +1,7 @@
 <?xml version="1.0" ?>
 <launch>    
-    <node name="Yolact_server" pkg="tracker_visp" type="Yolact_server_Pose_initializer.py" output="screen" />   
+    <arg name="threshold" default="0.3" />
+    <node name="Yolact_server" pkg="tracker_visp" type="Yolact_full_server.py" output="screen" args="$(arg threshold)"/>   
 
     <node name="rosserial_arduino_servo" pkg="tracker_visp" type="arduino_base.py" output="screen" />
 

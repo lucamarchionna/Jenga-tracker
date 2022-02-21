@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from locale import atof
 import rospy
 from tracker_visp.srv import *
 from tracker_visp.msg import *
@@ -131,6 +132,7 @@ class Yolact_full_service():
 
     self.cfg_name='yolact_resnet101_jenga_dataset_new_config'
     self.weights_path=os.path.join(self.yolact_path,'weights/yolact_resnet101_jenga_dataset_new_1199_180000.pth')
+    self.threshold=0.3
 
     ##### Setup #####
     if torch.cuda.is_available():
@@ -189,7 +191,7 @@ class Yolact_full_service():
 
     # %%
     # Detection
-    classes, scores, boxes, masks = self.compute_outputs(img,0.3)
+    classes, scores, boxes, masks = self.compute_outputs(img,self.threshold)
     print("Detected --> ",len(masks))
 
     # %%
@@ -426,7 +428,7 @@ class Yolact_full_service():
 
     # %%
     # Detection
-    classes, scores, boxes, masks = self.compute_outputs(img,0.3)
+    classes, scores, boxes, masks = self.compute_outputs(img,self.threshold)
     print("Detected --> ",len(masks))
 
     # %%
@@ -589,6 +591,13 @@ class Yolact_full_service():
 if __name__ == "__main__":
   rospy.init_node('Yolact_server')
   yolact_object=Yolact_full_service()
+
+  myargv = rospy.myargv(argv=sys.argv)
+  if len(myargv) == 1:
+    yolact_object.threshold=0.3
+  elif len(myargv) == 2:
+    yolact_object.threshold=atof(myargv[1])
+
   cv2.namedWindow(yolact_object.init_window_name)
   cv2.namedWindow(yolact_object.pose_window_name)
   try:
