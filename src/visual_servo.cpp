@@ -466,6 +466,8 @@ void visual_servoing::init_shortLoop()
   }
 
   pub_cartesian.publish(default_pose);
+  //Wait robot in position
+  ros::Duration(2.0).sleep();
 
   tracker = new vpMbGenericTracker(trackerTypes);
   
