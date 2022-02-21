@@ -44,79 +44,86 @@ visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh), s(vpFea
 
 void visual_servoing::estimationCallback(const geometry_msgs::Pose& tracker_pose_P) 
 {
-
+  
   vpColVector v_ee(3), omega_ee(3), v(6), e1(6);
   //e1 = 0;
-  threshold_pose = 0.12;
+  threshold_pose = 0.10;
+  while (!run_completed && node_handle.ok()) {
+    if (!block_axis) {
+      ROS_INFO("Inside");
+      camTtarget = visp_bridge::toVispHomogeneousMatrix(tracker_pose_P); 
+      targetTcam = camTtarget.inverse();
+      cdTc = cdTtarget*targetTcam;
+    }
 
-  if (!block_axis) {
-    camTtarget = visp_bridge::toVispHomogeneousMatrix(tracker_pose_P); 
-    targetTcam = camTtarget.inverse();
-    cdTc = cdTtarget*targetTcam;
-  }
+    else {
+      camTbase = homogeneousTransformation("camera_color_optical_frame", "edo_base_link");
+      camTtarget = camTbase*baseTtarget;
+      targetTcam = camTtarget.inverse();
+      cdTc = cdTtarget*targetTcam;
+    }
 
-  else {
-    camTbase = homogeneousTransformation("camera_color_optical_frame", "edo_base_link");
-    camTtarget = camTbase*baseTtarget;
-    targetTcam = camTtarget.inverse();
-    cdTc = cdTtarget*targetTcam;
-  }
+    s.buildFrom(camTtarget); //linear
+    s_tu.buildFrom(cdTc); //angular
 
-  s.buildFrom(camTtarget); //linear
-  s_tu.buildFrom(cdTc); //angular
+    v_cam = task.computeControlLaw();
 
-  v_cam = task.computeControlLaw();
+    error = (task.getError()).sumSquare(); // error = s^2 - s_star^2
 
-  error = (task.getError()).sumSquare(); // error = s^2 - s_star^2
-
-  //Convert velocities into the end-effector RF
-  v_ee = camTee.getRotationMatrix()*v_cam.rows(1,3);
-  
-  omega_ee = camTee.getRotationMatrix()*v_cam.rows(4,6);
-  v.insert(0, v_ee); v.insert(3, omega_ee);
-  velocityData = insertData(v);
-
-  if (error>=threshold && !block_axis) {
+    //Convert velocities into the end-effector RF
+    v_ee = camTee.getRotationMatrix()*v_cam.rows(1,3);
     
-    velocityInput.publish(velocityData);
-    vpColVector e = s.error(s_star); // e = (s-s*)
+    omega_ee = camTee.getRotationMatrix()*v_cam.rows(4,6);
+    v.insert(0, v_ee); v.insert(3, omega_ee);
+    velocityData = insertData(v);
 
+    if (error>=threshold && !block_axis) {
+      
+      velocityInput.publish(velocityData);
+      vpColVector e = s.error(s_star); // e = (s-s*)
+      break;
+      
+    }
+
+    else {
+
+      if (take_cTo) {
+
+        take_cTo = false;
+        lastPoseReceived = tracker_pose_P;
+      }
+
+      else {    
+        block_axis = true;
+
+        if (lastPoseReceived.position.z - camTtarget[2][3] < threshold_pose && retract == false )  {
+          signPoseReceived = 1.0; 
+          velocityData.twist.linear.z = signPoseReceived*0.04;
+          velocityInput.publish(velocityData);
+
+        }
+
+        else if (lastPoseReceived.position.z - camTtarget[2][3] < 0 && retract == true)  {
+          signPoseReceived = 0.0; 
+          run_completed = true;
+          go_to_service = true;
+        }
+
+        else {
+          signPoseReceived = -1.0; 
+          velocityData.twist.linear.z = signPoseReceived*0.04;
+          velocityInput.publish(velocityData);
+          retract = true;
+        }
+
+        if (!run_completed && !go_to_service) {
+          estimationCallback(lastPoseReceived);
+        }
+      }
+    }
   }
-
-  else {
-
-    if (take_cTo) {
-
-      take_cTo = false;
-      lastPose.publish(tracker_pose_P);
-      lastPoseReceived = tracker_pose_P;
-    }
-
-    else {    
-      block_axis = true;
-
-      if (lastPoseReceived.position.z - camTtarget[2][3] < threshold_pose && retract == false )  {
-        signPoseReceived = 1.0; 
-        velocityData.twist.linear.z = signPoseReceived*0.04;
-        velocityInput.publish(velocityData);
-      }
-
-      else if (lastPoseReceived.position.z - camTtarget[2][3] < 0 && retract == true)  {
-        signPoseReceived = 0.0; 
-        run_completed = true;
-        go_to_service = true;
-      }
-
-      else {
-        signPoseReceived = -1.0; 
-        velocityData.twist.linear.z = signPoseReceived*0.04;
-        velocityInput.publish(velocityData);
-        retract = true;
-      }
-
-
-      }
-    }
+      
+  
 
 }
 
@@ -399,7 +406,7 @@ void visual_servoing::init_shortLoop()
   servoPub.publish(angleVel_to_servo);
 
   geometry_msgs::PoseStamped default_pose;
-  default_pose.pose.position.x = 0.1;
+  default_pose.pose.position.x = 0.08;
   default_pose.pose.position.z = 0.7;
   pub_cartesian.publish(default_pose);
 
@@ -492,7 +499,8 @@ void visual_servoing::init_shortLoop()
   f_max = false;
   run_completed = false;
 
-  rotated=false;
+  rotated = false;
+  initialize_visualservoing = false;
 }
 
 void visual_servoing::reinit_vs() {
@@ -513,8 +521,8 @@ void visual_servoing::reinit_vs() {
 
   vpTranslationVector cdto;
   translX = translX - translX_policy;  //the correct one is x = -0.0035;
-  translY = 0.058;  //the correct one is y = 0.053;
-  translZ = 0.27;   //the correct one is z = 0.134
+  translY = 0.057;  //the correct one is y = 0.053;
+  translZ = 0.25;   //the correct one is z = 0.134
 
   cdto.buildFrom(translX, translY, translZ);
   vpRotationMatrix cdRo{1, 0, 0,
@@ -531,7 +539,7 @@ void visual_servoing::reinit_vs() {
   s_star.buildFrom(cdTtarget);
 
   s_tu.buildFrom(cdTc);
-task.setServo(vpServo::EYEINHAND_CAMERA);
+  task.setServo(vpServo::EYEINHAND_CAMERA);
   error = 5;
   threshold = 0.00002;
   block_axis = false;
@@ -554,9 +562,9 @@ int visual_servoing::init_matrices()
   translX_policy = 0;
 
   vpTranslationVector cdto;
-  translX = 0.0324 - translX_policy;  //the correct one is x = -0.0035;
-  translY = 0.058;  //the correct one is y = 0.053;
-  translZ = 0.27;   //the correct one is z = 0.134
+  translX = 0.0328 - translX_policy;  //the correct one is x = -0.0035;
+  translY = 0.0572;  //the correct one is y = 0.053;
+  translZ = 0.25;   //the correct one is z = 0.134
 
   cdto.buildFrom(translX, translY, translZ);
   vpRotationMatrix cdRo{1, 0, 0,
@@ -675,6 +683,7 @@ void visual_servoing::learning_process()
 
   std::vector<double> times_vec;
   std::vector<double> train_t_vec;
+  static tf2_ros::StaticTransformBroadcaster br_static;
   
   try {
     //To be able to display keypoints matching with test-detection-rs2
@@ -723,7 +732,6 @@ void visual_servoing::learning_process()
       // Get object pose
       if (!tracking_failed) {
         cMo = tracker->getPose();
-        cMo_old = cMo;
       }
 
       else {
@@ -746,6 +754,12 @@ void visual_servoing::learning_process()
       geometry_msgs::Pose cTo_P;
       cTo_P = visp_bridge::toGeometryMsgsPose(cMo); 
       trackerEstimation.publish(cTo_P);
+
+      if (!tracking_failed) {
+        cMo_old = cMo;
+        geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
+        br_static.sendTransform(pose_target2);  
+      }
 
       // Check tracking errors
       double proj_error = tracker->getProjectionError();
@@ -792,14 +806,7 @@ void visual_servoing::learning_process()
       if (vpDisplay::getClick(I_color, button, false)) {
         if (button == vpMouseButton::button3) {
           quit = true;
-          if (!tracking_failed) {
-            geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
-            static tf2_ros::StaticTransformBroadcaster br_static;
-            br_static.sendTransform(pose_target2);  
-          }
        
-          init_matrices();
-          init_servo();
         }
 
         else if (button == vpMouseButton::button1)
@@ -829,7 +836,6 @@ void visual_servoing::learning_process()
         } 
         rotated = true;
         geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2"); //initial estimation
-        static tf2_ros::StaticTransformBroadcaster br_static;
         br_static.sendTransform(pose_target2);  
       }
       
@@ -953,6 +959,7 @@ void visual_servoing::detection_process()
     
     eeTc1.buildFrom(t1, q_1);
     wTc1 = wTc*eeTc1.inverse();
+    
 
    
     //! [LOOP]
@@ -1033,6 +1040,12 @@ void visual_servoing::detection_process()
       if (!tracking_failed) {
         cMo = tracker->getPose();
         cMo_old = cMo;
+
+        if (!initialize_visualservoing) {
+          init_matrices();
+          init_servo();
+          initialize_visualservoing = true;
+        }
       }
 
       else {
@@ -1055,7 +1068,10 @@ void visual_servoing::detection_process()
       cTo_P = visp_bridge::toGeometryMsgsPose(cMo); 
       trackerEstimation.publish(cTo_P);
 
-      estimationCallback(cTo_P);
+      if (initialize_visualservoing) {
+        estimationCallback(cTo_P);
+      }
+      
 
       if (run_completed && retract && go_to_service) {
         ROS_INFO("Subscribing to service...");

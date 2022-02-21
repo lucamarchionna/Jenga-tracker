@@ -136,7 +136,7 @@ class visual_servoing
         vpFeatureTranslation s_star;
         vpFeatureThetaU s_tu;
         vpFeatureThetaU s_tu_star;
-        bool firstAddFeatures{true};
+        bool firstAddFeatures{true}, initialize_visualservoing{false};
         vpPoint point, point_des2;
         vpFeaturePoint ps, point_des;
         vpFeaturePoint p[4], pd[4];

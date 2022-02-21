@@ -3,10 +3,10 @@
   <ecm>
     <mask>
       <size>5</size>
-      <nb_mask>180</nb_mask>
+      <nb_mask>720</nb_mask>
     </mask>
     <range>
-      <tracking>5</tracking>
+      <tracking>6</tracking>
     </range>
     <contrast>
       <edge_threshold>10000</edge_threshold>
@@ -19,9 +19,9 @@
   </ecm>
   <klt>
     <mask_border>5</mask_border> 
-    <max_features>500</max_features> 
-    <window_size>5</window_size> 
-    <quality>0.02</quality> 
+    <max_features>50</max_features> 
+    <window_size>6</window_size> 
+    <quality>0.05</quality> 
     <min_distance>8</min_distance> 
     <harris>0.01</harris>
     <size_block>3</size_block> 
@@ -49,7 +49,7 @@
     <kdu>-0.08649131805040268</kdu>
   </camera>
   <face>
-    <angle_appear>80</angle_appear> 
+    <angle_appear>85</angle_appear> 
     <angle_disappear>80</angle_disappear> 
     <near_clipping>0.01</near_clipping>
     <far_clipping>1.5</far_clipping>
