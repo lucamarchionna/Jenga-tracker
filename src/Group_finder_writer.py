@@ -6,6 +6,8 @@ import quaternion
 
 from Block_class import Block
 
+from tracker_visp.msg import location
+
 class Blocks_group():
 
     def __init__(self,blocks_list,startIdx,img):
@@ -19,6 +21,8 @@ class Blocks_group():
         self.up1right0Idx=-1
         self.up1left1Idx=-1
         self.up1right1Idx=-1
+
+        self.location=location()
 
         self.img_cross=img.copy()
 
@@ -42,6 +46,12 @@ class Blocks_group():
         self.up1right0_block=Block(-1,[],[],[],-1)
         self.up1left1_block=Block(-1,[],[],[],-1)
         self.up1right1_block=Block(-1,[],[],[],-1)
+
+        # if self.start_block.block_type!='front_face':
+        #     print("Not a front face block")
+        #     return
+
+    def init_front_face(self,blocks_list,startIdx,img):
 
         if self.start_block.block_type!='front_face':
             print("Not a front face block")
@@ -250,6 +260,54 @@ class Blocks_group():
                             self.up1left1Idx=block_test1.idx
                             self.up1left1_block=block_test1
 
+    def init_side_face(self,blocks_list,startIdx,img,groups_list):
+        if self.start_block.block_type!='side_face':
+            print("Not a sude face block")
+            return
+        
+        # Starting block object: left near: side seen from left
+        try:
+            group_next=next((group for group in groups_list if group.leftIdx[0]==self.startIdx))
+            self.rightIdx[0]=group_next.startIdx
+            self.right0_block=group_next.start_block
+            self.rightIdx[1]=group_next.rightIdx[0]
+            self.right1_block=group_next.right0_block
+            self.upIdx=group_next.upIdx
+            self.up_block=group_next.up_block
+            self.downIdx=group_next.downIdx
+            self.down_block=group_next.down_block
+            self.up1Idx=group_next.up1left0Idx
+            self.up1_block=group_next.up1left0_block
+            self.up1right0Idx=group_next.up1Idx
+            self.up1right0_block=group_next.up1_block
+            self.up1right1Idx=group_next.up1right0Idx
+            self.up1right1_block=group_next.up1right0_block
+            found_next=True
+        except StopIteration:
+            found_next=False
+
+        if not found_next:
+            # Starting block object: left near: side seen from right
+            try:
+                group_next=next((group for group in groups_list if group.rightIdx[0]==self.startIdx))
+                self.leftIdx[0]=group_next.startIdx
+                self.left0_block=group_next.start_block
+                self.leftIdx[1]=group_next.leftIdx[0]
+                self.left1_block=group_next.left0_block
+                self.upIdx=group_next.upIdx
+                self.up_block=group_next.up_block
+                self.downIdx=group_next.downIdx
+                self.down_block=group_next.down_block
+                self.up1Idx=group_next.up1right0Idx
+                self.up1_block=group_next.up1right0_block
+                self.up1left0Idx=group_next.up1Idx
+                self.up1left0_block=group_next.up1_block
+                self.up1left1Idx=group_next.up1left0Idx
+                self.up1left1_block=group_next.up1left0_block            
+                found_next=True                
+            except StopIteration:
+                found_next=False
+
     def print_idx(self):
         #Print indices
         print("Index target: ",self.startIdx)
@@ -415,7 +473,7 @@ class Blocks_group():
         self.target_corner1=homogeneus_T_product(self.target_T_o,o_corner1)
         self.target_corner2=homogeneus_T_product(self.target_T_o,o_corner2)
         self.target_corner3=homogeneus_T_product(self.target_T_o,o_corner3)
-    
+
     def cao_file_write(self,cao_name,center_cao_path,right_cao_path,left_cao_path):
         self.cao_name=cao_name
         self.center_cao_path=center_cao_path
@@ -436,7 +494,7 @@ class Blocks_group():
             lines_to_write.append("V1\n")
 
             #block at center of horizontal
-            if self.rightIdx[0]!=-1 and self.leftIdx[0]!=-1:
+            if self.location.position=="cx":
                 lines_to_write.append(write_cao_line(self.center_cao_path,self.target_move_target,self.target_RotVec_target))
                 lines_to_write.append(write_cao_line(self.right_cao_path,self.target_move_right0,self.target_RotVec_target))
                 lines_to_write.append(write_cao_line(self.left_cao_path,self.target_move_left0,self.target_RotVec_target))
@@ -452,7 +510,7 @@ class Blocks_group():
                     lines_to_write.append(write_cao_line(self.right_cao_path,self.target_move_up1right0,self.target_RotVec_target))                    
 
             #block at left of horizontal
-            elif self.rightIdx[0]!=-1 and self.rightIdx[1]!=-1:
+            elif self.location.position=="sx":
                 lines_to_write.append(write_cao_line(self.left_cao_path,self.target_move_target,self.target_RotVec_target))
                 lines_to_write.append(write_cao_line(self.center_cao_path,self.target_move_right0,self.target_RotVec_target))
                 lines_to_write.append(write_cao_line(self.right_cao_path,self.target_move_right1,self.target_RotVec_target))
@@ -468,7 +526,7 @@ class Blocks_group():
                     lines_to_write.append(write_cao_line(self.right_cao_path,self.target_move_up1right1,self.target_RotVec_target))                    
 
             #block at right of horizontal
-            elif self.leftIdx[0]!=-1 and self.leftIdx[1]!=-1:
+            elif self.location.position=="dx":
                 lines_to_write.append(write_cao_line(self.right_cao_path,self.target_move_target,self.target_RotVec_target))
                 lines_to_write.append(write_cao_line(self.center_cao_path,self.target_move_left0,self.target_RotVec_target))
                 lines_to_write.append(write_cao_line(self.left_cao_path,self.target_move_left1,self.target_RotVec_target))
@@ -484,7 +542,7 @@ class Blocks_group():
                     lines_to_write.append(write_cao_line(self.left_cao_path,self.target_move_up1left1,self.target_RotVec_target))                    
 
             #missing central block, target at left of horizontal
-            elif self.rightIdx[0]==-1 and self.rightIdx[1]!=-1 and self.leftIdx[0]==-1:
+            elif self.location.position=="sx":
                 lines_to_write.append(write_cao_line(self.left_cao_path,self.target_move_target,self.target_RotVec_target))
                 lines_to_write.append(write_cao_line(self.right_cao_path,self.target_move_right1,self.target_RotVec_target))
                 if self.upIdx!=-1:   #keep same T not depending on target block on right or left side; front and rear faces depends on it though
@@ -499,7 +557,7 @@ class Blocks_group():
                     lines_to_write.append(write_cao_line(self.right_cao_path,self.target_move_up1right1,self.target_RotVec_target))                    
 
             #missing central block, target at right of horizontal
-            elif self.rightIdx[0]==-1 and self.leftIdx[0]==-1 and self.leftIdx[1]!=-1:
+            elif self.location.position=="dx":
                 lines_to_write.append(write_cao_line(self.right_cao_path,self.target_move_target,self.target_RotVec_target))
                 lines_to_write.append(write_cao_line(self.left_cao_path,self.target_move_left1,self.target_RotVec_target))
                 if self.upIdx!=-1:   #keep same T not depending on target block on right or left side; front and rear faces depends on it though
@@ -726,6 +784,45 @@ class Blocks_group():
                 file_initPose.write(str(r_cord[0])+"\n")
         
         return tvecs,rvecs
+        
+    def compute_location_position(self):
+        if self.rightIdx[0]!=-1 and self.leftIdx[0]!=-1:
+            #block at center of horizontal
+            self.location.position="cx"
+        elif self.rightIdx[0]!=-1 and self.rightIdx[1]!=-1:
+            #block at left of horizontal
+            self.location="sx"
+        elif self.leftIdx[0]!=-1 and self.leftIdx[1]!=-1:
+            #block at right of horizontal          
+            self.location="dx"  
+        #missing central block, target at left of horizontal
+        elif self.rightIdx[0]==-1 and self.rightIdx[1]!=-1 and self.leftIdx[0]==-1:
+            self.location.position="sx"
+        #missing central block, target at right of horizontal
+        elif self.rightIdx[0]==-1 and self.leftIdx[0]==-1 and self.leftIdx[1]!=-1:
+            self.location.position="dx"
+        ## Missing blocks conditions: 2 horizontal blocks
+        # target external left, the other at center
+        elif self.caseA or self.caseB:
+            self.location.position="sx"        
+        # target center, the other external left
+        elif self.caseC or self.caseD:    
+            self.location.position="cx"                
+        ## Missing blocks conditions: 2 horizontal blocks
+        # target center, the other external left
+        elif self.caseE or self.caseF:    
+            self.location.position="cx"
+        # target external right, the other at center
+        elif self.caseG or self.caseH:
+            self.location.position="dx"
+    
+    def compute_location_orientation(self,rvecs):
+        rvec=np.squeeze(rvecs)
+        if rvec[1]<0:	#radians, "right face seen from camera"
+            self.location.orientation="dx"
+        else:
+            self.location.orientation="sx"
+
 
 if __name__=='__main__':
     print("Must be used as a class")
