@@ -773,6 +773,11 @@ void visual_servoing::learning_process()
         else
           tracker->track(I_color);
       } catch (const vpException &e) {
+        {
+          std::stringstream ss;
+          ss << "Tracking failed: " << e.getStringMessage(); 
+          vpDisplay::displayText(I_color, 0, 20, ss.str(), vpColor::black);
+        }                
         std::cout << "Tracker exception: " << e.getStringMessage() << std::endl;
         tracking_failed = true;
       }
@@ -780,6 +785,11 @@ void visual_servoing::learning_process()
       // Check tracking errors
       double proj_error = tracker->getProjectionError();
       if (proj_error > opt_proj_error_threshold) {
+        {
+          std::stringstream ss;
+          ss << "Tracker needs to restart (projection error detected: " << proj_error << ")"
+          vpDisplay::displayText(I_color, 0, 20, ss.str(), vpColor::black);
+        }               
         std::cout << "Tracker needs to restart (projection error detected: " << proj_error << ")" << std::endl;
         tracking_failed = true;
       }
@@ -826,24 +836,6 @@ void visual_servoing::learning_process()
           }
         }
       }
-      vpDisplay::flush(I_color);
-      if(opt_use_depth){
-        vpDisplay::flush(I_depth_color);
-      }
-
-      vpMouseButton::vpMouseButtonType button;
-      if (vpDisplay::getClick(I_color, button, false)) {
-        if (button == vpMouseButton::button3) {
-          quit = true;
-       
-        }
-        else if (button == vpMouseButton::button1)
-          learn_position = true;
-      }
-
-      // Loop time
-      loop_t = vpTime::measureTimeMs() - t;
-      times_vec.push_back(loop_t);
 
       //Rotating base to learn from it
       if (!rotated && !tracking_failed) {
@@ -933,6 +925,30 @@ void visual_servoing::learning_process()
         cMo_old = cMo;
         geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo_copy, "camera_color_optical_frame" , "handeye_target2");
         br_static.sendTransform(pose_target2);  
+      }
+
+      // Loop time
+      loop_t = vpTime::measureTimeMs() - t;
+      times_vec.push_back(loop_t);
+      {
+        std::stringstream ss;
+        ss << "Loop time:" << loop_t; 
+        vpDisplay::displayText(I_color, 20, 20, "Left click: learn. Righ:quit", vpColor::red);
+        vpDisplay::displayText(I_color, I_color.getHeight() - 80, 20, ss.str(), vpColor::red);
+      }
+      vpDisplay::flush(I_color);
+      if(opt_use_depth){
+        vpDisplay::flush(I_depth_color);
+      }
+
+      vpMouseButton::vpMouseButtonType button;
+      if (vpDisplay::getClick(I_color, button, false)) {
+        if (button == vpMouseButton::button3) {
+          quit = true;
+       
+        }
+        else if (button == vpMouseButton::button1)
+          learn_position = true;
       }
 
     }
@@ -1091,6 +1107,11 @@ void visual_servoing::detection_process()
         }   
       catch (const vpException &e) {
         std::cout << "Tracker exception: " << e.getStringMessage() << std::endl;
+        {
+          std::stringstream ss;
+          ss << "Tracking failed: " << e.getStringMessage(); 
+          vpDisplay::displayText(I_color, 0, 20, ss.str(), vpColor::black);
+        }        
         tracking_failed = true;
         run_auto_init = true;
         // }
@@ -1154,21 +1175,7 @@ void visual_servoing::detection_process()
             vpDisplay::displayFrame(I_color, cMo, cam_color, 0.05, vpColor::none, 3);
           }
         }
-      }
-      vpDisplay::flush(I_color);
-      if(opt_use_depth){
-        vpDisplay::flush(I_depth_color);
-      }
-
-      vpMouseButton::vpMouseButtonType button;
-      if (vpDisplay::getClick(I_color, button, false)) {
-        if (button == vpMouseButton::button3) {
-          quit = true;
-       
-        }
-        else if (button == vpMouseButton::button1)
-          run_auto_init = true;
-      }      
+      }    
 
       // Modify, correct and Publish object pose
       geometry_msgs::Pose forward_IK = move_group.getCurrentPose("edo_link_ee").pose;
@@ -1230,6 +1237,28 @@ void visual_servoing::detection_process()
       // Loop time
       loop_t = vpTime::measureTimeMs() - t;
       times_vec.push_back(loop_t);
+
+      {
+        std::stringstream ss;
+        ss << "Loop time:" << loop_t; 
+        vpDisplay::displayText(I_color, 20, 20, "Left click: auto detect. Righ:quit", vpColor::red);
+        vpDisplay::displayText(I_color, I_color.getHeight() - 80, 20, ss.str(), vpColor::red);
+      }
+
+      vpDisplay::flush(I_color);
+      if(opt_use_depth){
+        vpDisplay::flush(I_depth_color);
+      }
+
+      vpMouseButton::vpMouseButtonType button;
+      if (vpDisplay::getClick(I_color, button, false)) {
+        if (button == vpMouseButton::button3) {
+          quit = true;
+       
+        }
+        else if (button == vpMouseButton::button1)
+          run_auto_init = true;
+      }  
 
     }
 
