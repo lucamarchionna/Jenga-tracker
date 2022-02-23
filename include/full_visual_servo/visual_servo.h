@@ -116,10 +116,10 @@ class visual_servoing
         tracker_visp::YolactInitializeCaoPose srv_cao;
         tracker_visp::RestartFirstLayer srv_init;
 
-        vpHomogeneousMatrix cMo, cMo_old, cTo, eeTc, eeTc1, wTee, depth_M_color, wTc, wTc1, eeTcam, baseTee, eeTtarget, baseTtarget, targetTcam, cam_desTtarget, camTtarget, cdTc, offset, cdTtarget, camTee, camTbase, bTee;
+        vpHomogeneousMatrix cMo, cMo_old, cTo, eeTc, eeTc1, wTee, depth_M_color, wTc, wTc1, eeTcam, baseTee, eeTtarget, baseTtarget, targetTcam, cam_desTtarget, camTtarget, cdTc, offset, cdTtarget, camTee, camTbase, bTee, bTc, bTe6, extrinsic;
 
         geometry_msgs::PoseStamped initialGuestPos;
-        geometry_msgs::Pose lastPoseReceived;
+        geometry_msgs::Pose lastPoseReceived, IK_pose;
         vpTranslationVector t_off;
         vpRxyzVector rxyz(vpRotationMatrix);
         vpRotationMatrix R_off;
@@ -156,7 +156,7 @@ class visual_servoing
         double vitesse;
         double rapport;
         bool block_axis{false}, take_cTo{true}, retract{false}, go_to_service{true};
-        float signPoseReceived{1.0};
+        float signPoseReceived{1.0}, signPullX{1.0}, distance_run{0.1};
         vpColVector v_ee(unsigned int n), omega_ee(unsigned int n), v_cam, v(unsigned int n), e1, proj_e1;
 
 
@@ -167,7 +167,7 @@ class visual_servoing
         ros::Publisher pub, lastPose, pub_cartesian;
         double opt_learn, opt_auto_init, opt_proj_error_threshold{25.0}, opt_setGoodME_thresh{0.4};
         int opt_disp_visibility{0}, width{640}, height{480}, fps{30};
-        bool opt_display_projection_error{false}, opt_display_features{false}, opt_display_model{true}, opt_yolact_init{true}, opt_pose_init{true}, learn_position{true}, rotated{false}, f_max{false}, run_completed{false};
+        bool opt_display_projection_error{false}, opt_display_features{false}, opt_display_model{true}, opt_yolact_init{true}, opt_pose_init{true}, learn_position{true}, rotated{false}, f_max{false}, run_completed{false}, opt_use_depth{false};
         vpRotationMatrix cdRo;
         vpKeyPoint keypoint;
         vpMbGenericTracker *tracker;

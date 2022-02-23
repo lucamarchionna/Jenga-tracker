@@ -81,7 +81,7 @@ void tracking::init_parameters()
 {
   tracker_visp::angle_velocity angleVel_to_servo;
   angleVel_to_servo.angle = 90;	//degrees, setup angle
-  angleVel_to_servo.velocity = 0.005; //degrees/ms, velocity fast
+  angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
   servoPub.publish(angleVel_to_servo);
   //Settings  
   tracker_path = ros::package::getPath("tracker_visp");
@@ -123,7 +123,7 @@ void tracking::init_parameters()
   fps = 30;
   
   I_color.init(height, width);
-  I_gray.init(height, width);
+  I_gray.init(height, width); 
   I_depth_gray.init(height, width);
   I_depth_color.init(height, width);
   I_depth_raw.init(height, width);
@@ -138,9 +138,8 @@ void tracking::init_parameters()
     d3.init(ILearned, _posx+I_color.getWidth()*2+10, _posy, "Learned-images");
   }
   
-
   // [Acquire stream and initialize displays]
-  while (node_handle.ok()) {
+  while (node_handle.ok()) { 
     realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, NULL, NULL);
 
     vpDisplay::display(I_color);
@@ -197,14 +196,14 @@ void tracking::learning_process()
   // Define tracker types
   
   // trackerTypes.push_back(vpMbGenericTracker::EDGE_TRACKER | vpMbGenericTracker::KLT_TRACKER);
-  trackerTypes.push_back(vpMbGenericTracker::EDGE_TRACKER);
+  trackerTypes.push_back(vpMbGenericTracker::EDGE_TRACKER);  
   if (opt_use_depth){    
     trackerTypes.push_back(vpMbGenericTracker::DEPTH_DENSE_TRACKER);
   }
 
   tracker = new vpMbGenericTracker(trackerTypes);
   
- if (opt_use_depth){   
+  if (opt_use_depth){   
     tracker->loadConfigFile(opt_config, opt_config);
     //tracker->loadModel(opt_model, opt_model);
     tracker->setCameraTransformationMatrix(mapOfCameraTransformations);
@@ -289,7 +288,7 @@ void tracking::learning_process()
             opt_model=srv.response.caoFilePath.data;
             if (opt_model!=""){
               geometry_msgs::Pose initPose=srv.response.initPose.pose.pose;
-              cMo=visp_bridge::toVispHomogeneousMatrix(initPose);	//object pose cMo             
+              cMo=visp_bridge::toVispHomogeneousMatrix(initPose);	//object pose cMo
               if (opt_use_depth){
                 tracker->loadModel(opt_model, opt_model);
                 mapOfCameraPoses["Camera1"] = cMo;
@@ -430,7 +429,7 @@ void tracking::learning_process()
             mapOfCameraPoses["Camera1"] = cMo;
             mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
             // Initialize from detection
-            tracker->initFromPose(mapOfImages, mapOfCameraPoses);        
+            tracker->initFromPose(mapOfImages, mapOfCameraPoses);
           }
           else {
             tracker->initFromPose(I_color, cMo);
@@ -466,7 +465,7 @@ void tracking::learning_process()
           tracker->track(mapOfImages, mapOfPointclouds, mapOfWidths, mapOfHeights);
         else
           tracker->track(I_color);
-        } 
+      } 
         catch (const std::length_error& le){
           std::cerr << "Length error: " << le.what() << '\n';
           if (opt_auto_init) {
@@ -583,7 +582,7 @@ void tracking::learning_process()
         // SERVO SEND ANGLE
         vpThetaUVector cTo_tu = cMo.getThetaUVector();
         tracker_visp::angle_velocity angleVel_to_servo;
-        angleVel_to_servo.velocity = 0.005; //degrees/ms, velocity slow
+        angleVel_to_servo.velocity = 0.01; //degrees/ms, velocity slow
         // std::cout << "Theta: \n" << angle << std::endl;
         if (cTo_tu[1]<0){	//radians, "right face seen from camera"
           angleVel_to_servo.angle = 130;	//degrees, final angle
@@ -701,9 +700,8 @@ void tracking::detection_process()
   d3.setDownScalingFactor(vpDisplay::SCALE_AUTO);
   d3.init(IMatching, _posx+I_gray.getWidth()*2+10, _posy, "Detection-from-learned");
 
-
-  // [Map of images to use tracker with depth]
-  depth_M_color = realsense.getTransformation(RS2_STREAM_COLOR, RS2_STREAM_DEPTH);
+  depth_M_color = realsense.getTransformation(RS2_STREAM_COLOR, RS2_STREAM_DEPTH); 
+// [Map of images to use tracker with depth]
   std::map<std::string, vpHomogeneousMatrix> mapOfCameraTransformations;
   std::map<std::string, const vpImage<vpRGBa> *> mapOfImages;
   std::map<std::string, std::string> mapOfInitFiles;
@@ -712,7 +710,7 @@ void tracking::detection_process()
   std::map<std::string, unsigned int> mapOfWidths, mapOfHeights;
   std::map<std::string, vpHomogeneousMatrix> mapOfCameraPoses;
   std::vector<vpColVector> pointcloud;
-  
+
   mapOfCameraTransformations["Camera2"] = depth_M_color;
   mapOfImages["Camera1"] = &I_color;
   mapOfImages["Camera2"] = &I_depth_color;
@@ -913,7 +911,7 @@ void tracking::detection_process()
           tracker->track(mapOfImages, mapOfPointclouds, mapOfWidths, mapOfHeights);
         else
           tracker->track(I_color);
-      }  
+      } 
         catch (const std::length_error& le){
           std::cerr << "Length error: " << le.what() << '\n';
           if (opt_auto_init) {
@@ -953,8 +951,29 @@ void tracking::detection_process()
       //   }
       //   rotated = true;
       // }
-    
+
+      // Get and publish object pose
       cMo = tracker->getPose();
+      geometry_msgs::Pose forward_IK = move_group.getCurrentPose("edo_link_ee").pose;
+      bTee = visp_bridge::toVispHomogeneousMatrix(forward_IK); 
+      vpThetaUVector bTee_tu = bTee.getThetaUVector();
+
+      
+      vpThetaUVector cMo_tu = cMo.getThetaUVector();
+      cMo_tu[0] = -(M_PI_2-bTee_tu[1]); 
+      cMo_tu[2] = 0; 
+      cMo.insert(cMo_tu);
+      //cTo = cMo;
+      //q_unit << 0, 0, 0, 1;
+      //cTo.insert(q_unit); //only for simulation
+      geometry_msgs::TransformStamped pose_target = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target");
+      br.sendTransform(pose_target);
+
+      
+      geometry_msgs::Pose cTo_P;
+      cTo_P = visp_bridge::toGeometryMsgsPose(cMo); 
+      trackerEstimation.publish(cTo_P);
+      
 
       // Check tracking errors
       double proj_error = 0;
@@ -1013,27 +1032,6 @@ void tracking::detection_process()
       if(opt_use_depth){
         vpDisplay::flush(I_depth_color);
       }
-
-      // Get and publish object pose
-      geometry_msgs::Pose forward_IK = move_group.getCurrentPose("edo_link_ee").pose;
-      bTee = visp_bridge::toVispHomogeneousMatrix(forward_IK); 
-      vpThetaUVector bTee_tu = bTee.getThetaUVector();
-
-      
-      vpThetaUVector cMo_tu = cMo.getThetaUVector();
-      cMo_tu[0] = -(M_PI_2-bTee_tu[1]); 
-      cMo_tu[2] = 0; 
-      cMo.insert(cMo_tu);
-      //cTo = cMo;
-      //q_unit << 0, 0, 0, 1;
-      //cTo.insert(q_unit); //only for simulation
-      geometry_msgs::TransformStamped pose_target = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target");
-      br.sendTransform(pose_target);
-
-      
-      geometry_msgs::Pose cTo_P;
-      cTo_P = visp_bridge::toGeometryMsgsPose(cMo); 
-      trackerEstimation.publish(cTo_P);
 
       if (vpDisplay::getClick(I_color, button, false)) {
         if (button == vpMouseButton::button3) {
@@ -1106,7 +1104,7 @@ void tracking::detection_process()
     //! [END OF LOOP]
     tracker_visp::angle_velocity angleVel_to_servo;
     angleVel_to_servo.angle = 90;	//degrees, setup angle
-    angleVel_to_servo.velocity = 0.005; //degrees/ms, velocity fast
+    angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
     servoPub.publish(angleVel_to_servo);
 
     // Terminate learning phase, save all on exit
@@ -1123,7 +1121,7 @@ void tracking::detection_process()
     if (!times_vec.empty()) {
       tracker_visp::angle_velocity angleVel_to_servo;
       angleVel_to_servo.angle = 90;	//degrees, setup angle
-      angleVel_to_servo.velocity = 0.005; //degrees/ms, velocity fast
+      angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
       servoPub.publish(angleVel_to_servo);
     std::cout << "\nProcessing time, Mean: " << vpMath::getMean(times_vec) << " ms ; Median: " << vpMath::getMedian(times_vec)
               << " ; Std: " << vpMath::getStdev(times_vec) << " ms" << std::endl;
@@ -1150,7 +1148,7 @@ int main(int argc, char** argv)
 {
   ros::init(argc, argv, "tracker");
   ros::NodeHandle nh;   
-  ros::AsyncSpinner spinner(8);
+  ros::AsyncSpinner spinner(1);
   spinner.start();
   ros::Rate loop_rate(20); 
 
