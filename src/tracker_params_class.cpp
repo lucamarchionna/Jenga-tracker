@@ -123,22 +123,23 @@ void tracking::init_parameters()
   fps = 30;
   
   I_color.init(height, width);
-  I_gray.init(height, width);
+  I_gray.init(height, width); 
   I_depth_gray.init(height, width);
   I_depth_color.init(height, width);
   I_depth_raw.init(height, width);
 
   _posx = 100; _posy = 50;
   d1.init(I_color, _posx, _posy, "Color stream");
-  d2.init(I_depth_color, _posx, _posy + I_gray.getHeight()+10, "Depth stream");
+  if (opt_use_depth){    
+    d2.init(I_depth_color, _posx, _posy + I_gray.getHeight()+10, "Depth stream");
+  }
   ILearned.init(I_color.getHeight()*2,I_color.getWidth()*2);
   if (opt_learn){
     d3.init(ILearned, _posx+I_color.getWidth()*2+10, _posy, "Learned-images");
   }
   
-
   // [Acquire stream and initialize displays]
-  while (node_handle.ok()) {
+  while (node_handle.ok()) { 
     realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, NULL, NULL);
 
     vpDisplay::display(I_color);
@@ -147,13 +148,15 @@ void tracking::init_parameters()
     if (vpDisplay::getClick(I_color, false))
       break;
 
-    vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
-    vpImageConvert::convert(I_depth_gray,I_depth_color);
-    vpDisplay::display(I_depth_color);
-    vpDisplay::displayText(I_depth_color, 20, 20, "Click when ready.", vpColor::red);
-    vpDisplay::flush(I_depth_color);
-    if (vpDisplay::getClick(I_depth_color, false))
-      break;
+    if (opt_use_depth){  
+      vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
+      vpImageConvert::convert(I_depth_gray,I_depth_color);
+      vpDisplay::display(I_depth_color);
+      vpDisplay::displayText(I_depth_color, 20, 20, "Click when ready.", vpColor::red);
+      vpDisplay::flush(I_depth_color);
+      if (vpDisplay::getClick(I_depth_color, false))
+        break;
+    }
   }
 
 }
@@ -182,23 +185,34 @@ void tracking::learning_process()
   std::string extractorName = "ORB";
   std::string matcherName = "BruteForce-Hamming";
   
-  mapOfCameraTransformations["Camera2"] = depth_M_color;
-  mapOfImages["Camera1"] = &I_color;
-  mapOfImages["Camera2"] = &I_depth_color;
-  mapOfInitFiles["Camera1"] = opt_init;
-  mapOfInitPoses["Camera1"] = opt_init_pos;
+  if (opt_use_depth){  
+    mapOfCameraTransformations["Camera2"] = depth_M_color;
+    mapOfImages["Camera1"] = &I_color;
+    mapOfImages["Camera2"] = &I_depth_color;
+    mapOfInitFiles["Camera1"] = opt_init;
+    mapOfInitPoses["Camera1"] = opt_init_pos;
+  }
 
   // Define tracker types
   
-  trackerTypes.push_back(vpMbGenericTracker::EDGE_TRACKER | vpMbGenericTracker::KLT_TRACKER);
-  trackerTypes.push_back(vpMbGenericTracker::DEPTH_DENSE_TRACKER);
+  // trackerTypes.push_back(vpMbGenericTracker::EDGE_TRACKER | vpMbGenericTracker::KLT_TRACKER);
+  trackerTypes.push_back(vpMbGenericTracker::EDGE_TRACKER);  
+  if (opt_use_depth){    
+    trackerTypes.push_back(vpMbGenericTracker::DEPTH_DENSE_TRACKER);
+  }
 
   tracker = new vpMbGenericTracker(trackerTypes);
   
-  tracker->loadConfigFile(opt_config, opt_config);
-  //tracker->loadModel(opt_model, opt_model);
-  tracker->setCameraTransformationMatrix(mapOfCameraTransformations);
-  tracker->setCameraParameters(cam_color, cam_depth);
+  if (opt_use_depth){   
+    tracker->loadConfigFile(opt_config, opt_config);
+    //tracker->loadModel(opt_model, opt_model);
+    tracker->setCameraTransformationMatrix(mapOfCameraTransformations);
+    tracker->setCameraParameters(cam_color, cam_depth);
+  }
+  else {
+    tracker->loadConfigFile(opt_config);
+    tracker->setCameraParameters(cam_color);    
+  }
 
   if (opt_learn || opt_auto_init) {
     // Load keypoints config
@@ -247,10 +261,12 @@ void tracking::learning_process()
           return;
       }
 
-      vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
-      vpImageConvert::convert(I_depth_gray,I_depth_color);
-      mapOfImages["Camera1"] = &I_color;
-      mapOfImages["Camera2"] = &I_depth_color;
+      if (opt_use_depth){
+        vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
+        vpImageConvert::convert(I_depth_gray,I_depth_color);
+        mapOfImages["Camera1"] = &I_color;
+        mapOfImages["Camera2"] = &I_depth_color;
+      }
       vpDisplay::display(I_color);
       vpDisplay::displayText(I_color, 20, 20, "Left click: start service. Righ:quit", vpColor::red);
       vpDisplay::flush(I_color);
@@ -273,10 +289,16 @@ void tracking::learning_process()
             if (opt_model!=""){
               geometry_msgs::Pose initPose=srv.response.initPose.pose.pose;
               cMo=visp_bridge::toVispHomogeneousMatrix(initPose);	//object pose cMo
-              tracker->loadModel(opt_model, opt_model);
-              mapOfCameraPoses["Camera1"] = cMo;
-              mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
-              tracker->initFromPose(mapOfImages,mapOfCameraPoses);
+              if (opt_use_depth){
+                tracker->loadModel(opt_model, opt_model);
+                mapOfCameraPoses["Camera1"] = cMo;
+                mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
+                tracker->initFromPose(mapOfImages,mapOfCameraPoses);
+              }
+              else{
+                tracker->loadModel(opt_model);
+                tracker->initFromPose(I_color,cMo);
+              }
             }
             else {
               ROS_INFO("Image discarded");
@@ -295,11 +317,21 @@ void tracking::learning_process()
   else {
     if (opt_pose_init){
       // // Initialize from pose file .pos
-      tracker->initFromPose(mapOfImages,mapOfInitPoses);
+      if(opt_use_depth){
+        tracker->initFromPose(mapOfImages,mapOfInitPoses);
+      }
+      else{
+        tracker->initFromPose(I_color,opt_init_pos);
+      }
     }
     else {
       // // Initialize with clicks from .init
-      tracker->initClick(mapOfImages, mapOfInitFiles, true);
+      if(opt_use_depth){
+        tracker->initClick(mapOfImages, mapOfInitFiles, true);
+      }
+      else {
+        tracker->initClick(I_color, opt_init, true);
+      }
     }
   }
 
@@ -361,14 +393,16 @@ void tracking::learning_process()
       // Acquire images, visualize and update tracker input data
       realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, &pointcloud, NULL, NULL);
       vpDisplay::display(I_color);
-      vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
-      vpImageConvert::convert(I_depth_gray, I_depth_color);
-      vpDisplay::display(I_depth_color);
+      if (opt_use_depth){
+        vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
+        vpImageConvert::convert(I_depth_gray, I_depth_color);
+        vpDisplay::display(I_depth_color);
 
-      mapOfImages["Camera1"] = &I_color;
-      mapOfPointclouds["Camera2"] = &pointcloud;
-      mapOfWidths["Camera2"] = width;
-      mapOfHeights["Camera2"] = height;
+        mapOfImages["Camera1"] = &I_color;
+        mapOfPointclouds["Camera2"] = &pointcloud;
+        mapOfWidths["Camera2"] = width;
+        mapOfHeights["Camera2"] = height;
+      }
 
 
       // Run auto initialization from learned data
@@ -391,16 +425,22 @@ void tracking::learning_process()
           ss  << "Number of references: " << keypoint.getReferencePointNumber();
           vpDisplay::displayText(IMatching, 60, 20, ss.str(), vpColor::red);
           vpDisplay::flush(IMatching);
-          mapOfCameraPoses["Camera1"] = cMo;
-          mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
-          // Initialize from detection
-          tracker->initFromPose(mapOfImages, mapOfCameraPoses);
+          if (opt_use_depth){
+            mapOfCameraPoses["Camera1"] = cMo;
+            mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
+            // Initialize from detection
+            tracker->initFromPose(mapOfImages, mapOfCameraPoses);
+          }
+          else {
+            tracker->initFromPose(I_color, cMo);
+          }
           std::cout << "Detection succeed in elapsed time: " << vpTime::measureTimeMs() - detect_t << " ms" << std::endl;
           detect_t_vec.push_back(vpTime::measureTimeMs() - detect_t);
         } 
         else {
           vpDisplay::flush(I_color);
-          vpDisplay::flush(I_depth_color);
+          if(opt_use_depth)
+            vpDisplay::flush(I_depth_color);
           //Keep searching
           continue;
         }
@@ -408,7 +448,10 @@ void tracking::learning_process()
       else if (tracking_failed) {
         // Manual init
         tracking_failed = false;
-        tracker->initClick(mapOfImages, mapOfInitFiles, true);
+        if(opt_use_depth)
+          tracker->initClick(mapOfImages, mapOfInitFiles, true);
+        else
+          tracker->initClick(I_color, opt_init, true);
       }
 
       // Run the tracker
@@ -418,7 +461,11 @@ void tracking::learning_process()
           tracker->setDisplayFeatures(false);
           run_auto_init = false;
         }
-        tracker->track(mapOfImages, mapOfPointclouds, mapOfWidths, mapOfHeights);
+
+        if(opt_use_depth)
+          tracker->track(mapOfImages, mapOfPointclouds, mapOfWidths, mapOfHeights);
+        else
+          tracker->track(I_color);
       } 
         catch (const std::length_error& le){
           std::cerr << "Length error: " << le.what() << '\n';
@@ -435,20 +482,6 @@ void tracking::learning_process()
             run_auto_init = true;
           }
       }
-
-
-      // Define camera's RF
-      
-      vpTranslationVector t_cam; t_cam << 0.54, 0.08, 0.4;
-      vpQuaternionVector q_cam, q_unit; q_cam << 0, 0, 0.7071068, 0.7071068;
-      
-      //eeTc.buildFrom(t_cam, q_cam);
-      //geometry_msgs::TransformStamped camera_RF = toMoveit(eeTc, "world", "object");
-      //br.sendTransform(camera_RF);
-      
-      //geometry_msgs::TransformStamped camera_1 = toMoveit(wTc1, "world", "camera_1");
-      //br.sendTransform(camera_1);
-
       // Get and publish object pose
       cMo = tracker->getPose();
 
@@ -509,21 +542,27 @@ void tracking::learning_process()
         }
 
         // Display model
-        if (opt_display_model)
-          tracker->display(I_color, I_depth_color, cMo, depth_M_color*cMo, cam_color, cam_depth, vpColor::green, 1);
-        
-        // Display frames
-        vpDisplay::displayFrame(I_color, cMo, cam_color, 0.05, vpColor::none, 3);
-        vpDisplay::displayFrame(I_depth_color, depth_M_color*cMo, cam_depth, 0.05, vpColor::none, 3);
-
+        if (opt_display_model){
+          if(opt_use_depth){
+            tracker->display(I_color, I_depth_color, cMo, depth_M_color*cMo, cam_color, cam_depth, vpColor::green, 1);
+            // Display frames
+            vpDisplay::displayFrame(I_color, cMo, cam_color, 0.05, vpColor::none, 3);
+            vpDisplay::displayFrame(I_depth_color, depth_M_color*cMo, cam_depth, 0.05, vpColor::none, 3);
+          }
+          else{
+            tracker->display(I_color, cMo, cam_color, vpColor::green, 1);
+            vpDisplay::displayFrame(I_color, cMo, cam_color, 0.05, vpColor::none, 3);
+          }
+        }
       }
 
       vpMouseButton::vpMouseButtonType button;
       
       vpDisplay::flush(I_color);
 
-
-      vpDisplay::flush(I_depth_color);
+      if(opt_use_depth){
+        vpDisplay::flush(I_depth_color);
+      }
 
       if (vpDisplay::getClick(I_color, button, false)) {
         if (button == vpMouseButton::button3) {
@@ -534,7 +573,7 @@ void tracking::learning_process()
           run_auto_init = true;
         }
       }
-      if (vpDisplay::getClick(I_depth_color, false)) {
+      if (opt_use_depth && vpDisplay::getClick(I_depth_color, false)) {
         quit = true;
       }
 
@@ -662,9 +701,8 @@ void tracking::detection_process()
   d3.setDownScalingFactor(vpDisplay::SCALE_AUTO);
   d3.init(IMatching, _posx+I_gray.getWidth()*2+10, _posy, "Detection-from-learned");
 
-
-  // [Map of images to use tracker with depth]
-  depth_M_color = realsense.getTransformation(RS2_STREAM_COLOR, RS2_STREAM_DEPTH);
+  depth_M_color = realsense.getTransformation(RS2_STREAM_COLOR, RS2_STREAM_DEPTH); 
+// [Map of images to use tracker with depth]
   std::map<std::string, vpHomogeneousMatrix> mapOfCameraTransformations;
   std::map<std::string, const vpImage<vpRGBa> *> mapOfImages;
   std::map<std::string, std::string> mapOfInitFiles;
@@ -673,7 +711,7 @@ void tracking::detection_process()
   std::map<std::string, unsigned int> mapOfWidths, mapOfHeights;
   std::map<std::string, vpHomogeneousMatrix> mapOfCameraPoses;
   std::vector<vpColVector> pointcloud;
-  
+
   mapOfCameraTransformations["Camera2"] = depth_M_color;
   mapOfImages["Camera1"] = &I_color;
   mapOfImages["Camera2"] = &I_depth_color;
@@ -803,14 +841,16 @@ void tracking::detection_process()
       // Acquire images, visualize and update tracker input data
       realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, &pointcloud, NULL, NULL);
       vpDisplay::display(I_color);
-      vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
-      vpImageConvert::convert(I_depth_gray, I_depth_color);
-      vpDisplay::display(I_depth_color);
+      if (opt_use_depth){
+        vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
+        vpImageConvert::convert(I_depth_gray, I_depth_color);
+        vpDisplay::display(I_depth_color);
 
-      mapOfImages["Camera1"] = &I_color;
-      mapOfPointclouds["Camera2"] = &pointcloud;
-      mapOfWidths["Camera2"] = width;
-      mapOfHeights["Camera2"] = height;
+        mapOfImages["Camera1"] = &I_color;
+        mapOfPointclouds["Camera2"] = &pointcloud;
+        mapOfWidths["Camera2"] = width;
+        mapOfHeights["Camera2"] = height;
+      }
 
       // Run auto initialization from learned data
       if (run_auto_init) {
@@ -832,16 +872,22 @@ void tracking::detection_process()
           ss  << "Number of references: " << keypoint.getReferencePointNumber();
           vpDisplay::displayText(IMatching, 60, 20, ss.str(), vpColor::red);
           vpDisplay::flush(IMatching);
-          mapOfCameraPoses["Camera1"] = cMo;
-          mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
-          // Initialize from detection
-          tracker->initFromPose(mapOfImages, mapOfCameraPoses);
+          if (opt_use_depth){
+            mapOfCameraPoses["Camera1"] = cMo;
+            mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
+            // Initialize from detection
+            tracker->initFromPose(mapOfImages, mapOfCameraPoses);
+          }
+          else {
+            tracker->initFromPose(I_color, cMo);
+          }
           std::cout << "Detection succeed in elapsed time: " << vpTime::measureTimeMs() - detect_t << " ms" << std::endl;
           detect_t_vec.push_back(vpTime::measureTimeMs() - detect_t);
         } 
         else {
           vpDisplay::flush(I_color);
-          vpDisplay::flush(I_depth_color);
+          if(opt_use_depth)
+            vpDisplay::flush(I_depth_color);
           //Keep searching
           continue;
         }
@@ -849,7 +895,10 @@ void tracking::detection_process()
       else if (tracking_failed) {
         // Manual init
         tracking_failed = false;
-        tracker->initClick(mapOfImages, mapOfInitFiles, true);
+        if(opt_use_depth)
+          tracker->initClick(mapOfImages, mapOfInitFiles, true);
+        else
+          tracker->initClick(I_color, opt_init, true);
       }
 
       // Run the tracker
@@ -859,7 +908,10 @@ void tracking::detection_process()
           tracker->setDisplayFeatures(false);
           run_auto_init = false;
         }
-        tracker->track(mapOfImages, mapOfPointclouds, mapOfWidths, mapOfHeights);
+        if(opt_use_depth)
+          tracker->track(mapOfImages, mapOfPointclouds, mapOfWidths, mapOfHeights);
+        else
+          tracker->track(I_color);
       } 
         catch (const std::length_error& le){
           std::cerr << "Length error: " << le.what() << '\n';
@@ -900,20 +952,6 @@ void tracking::detection_process()
       //   }
       //   rotated = true;
       // }
-
-
-
-      // Define camera's RF
-      
-      vpTranslationVector t_cam; t_cam << 0.54, 0.08, 0.4;
-      vpQuaternionVector q_cam, q_unit; q_cam << 0, 0, 0.7071068, 0.7071068;
-      
-      //eeTc.buildFrom(t_cam, q_cam);
-      //geometry_msgs::TransformStamped camera_RF = toMoveit(eeTc, "world", "object");
-      //br.sendTransform(camera_RF);
-      
-      //geometry_msgs::TransformStamped camera_1 = toMoveit(wTc1, "world", "camera_1");
-      //br.sendTransform(camera_1);
 
       // Get and publish object pose
       cMo = tracker->getPose();
@@ -973,13 +1011,18 @@ void tracking::detection_process()
         }
 
         // Display model
-        if (opt_display_model)
-          tracker->display(I_color, I_depth_color, cMo, depth_M_color*cMo, cam_color, cam_depth, vpColor::green, 1);
-        
-        // Display frames
-        vpDisplay::displayFrame(I_color, cMo, cam_color, 0.05, vpColor::none, 3);
-        vpDisplay::displayFrame(I_depth_color, depth_M_color*cMo, cam_depth, 0.05, vpColor::none, 3);
-
+        if (opt_display_model){
+          if(opt_use_depth){
+            tracker->display(I_color, I_depth_color, cMo, depth_M_color*cMo, cam_color, cam_depth, vpColor::green, 1);
+            // Display frames
+            vpDisplay::displayFrame(I_color, cMo, cam_color, 0.05, vpColor::none, 3);
+            vpDisplay::displayFrame(I_depth_color, depth_M_color*cMo, cam_depth, 0.05, vpColor::none, 3);
+          }
+          else{
+            tracker->display(I_color, cMo, cam_color, vpColor::green, 1);
+            vpDisplay::displayFrame(I_color, cMo, cam_color, 0.05, vpColor::none, 3);
+          }
+        }
       }
 
       vpMouseButton::vpMouseButtonType button;
@@ -987,7 +1030,9 @@ void tracking::detection_process()
       vpDisplay::flush(I_color);
 
 
-      vpDisplay::flush(I_depth_color);
+      if(opt_use_depth){
+        vpDisplay::flush(I_depth_color);
+      }
 
       if (vpDisplay::getClick(I_color, button, false)) {
         if (button == vpMouseButton::button3) {
@@ -998,7 +1043,7 @@ void tracking::detection_process()
           run_auto_init = true;
         }
       }
-      if (vpDisplay::getClick(I_depth_color, false)) {
+      if (opt_use_depth && vpDisplay::getClick(I_depth_color, false)) {
         quit = true;
       }
 
