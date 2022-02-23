@@ -3,18 +3,18 @@
   <ecm>
     <mask>
       <size>5</size>
-      <nb_mask>720</nb_mask>
+      <nb_mask>360</nb_mask>
     </mask>
     <range>
       <tracking>6</tracking>
     </range>
     <contrast>
-      <edge_threshold>10000</edge_threshold>
-      <mu1>0.5</mu1>
-      <mu2>0.5</mu2>
+      <edge_threshold>12000</edge_threshold>
+      <mu1>0.4</mu1>
+      <mu2>0.6</mu2>
     </contrast>
     <sample>
-      <step>2</step>
+      <step>3</step>
     </sample>
   </ecm>
   <klt>
@@ -49,8 +49,8 @@
     <kdu>-0.08649131805040268</kdu>
   </camera>
   <face>
-    <angle_appear>85</angle_appear> 
-    <angle_disappear>80</angle_disappear> 
+    <angle_appear>75</angle_appear> 
+    <angle_disappear>85</angle_disappear> 
     <near_clipping>0.01</near_clipping>
     <far_clipping>1.5</far_clipping>
     <fov_clipping>0</fov_clipping>
