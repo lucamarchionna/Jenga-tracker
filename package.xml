@@ -59,7 +59,6 @@
   <build_depend>pcl_msgs</build_depend>  
   <build_depend>roscpp</build_depend>
   <build_depend>rospy</build_depend>
-  <build_depend>visp_ros</build_depend>
   <build_depend>visp_bridge</build_depend>
   <build_depend>visp</build_depend>
 
@@ -75,7 +74,6 @@
   <build_export_depend>pcl_msgs</build_export_depend>
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>rospy</build_export_depend>
-  <build_export_depend>visp_ros</build_export_depend>
   <build_export_depend>visp_bridge</build_export_depend>
   <build_export_depend>visp</build_export_depend>
 
@@ -84,7 +82,6 @@
   <exec_depend>pcl_msgs</exec_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>rospy</exec_depend>
-  <exec_depend>visp_ros</exec_depend>
   <exec_depend>visp_bridge</exec_depend>
   <exec_depend>visp</exec_depend>
   <exec_depend>message_runtime</exec_depend>

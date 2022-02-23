@@ -12,7 +12,6 @@ find_package(realsense2 REQUIRED)
 find_package(VISP REQUIRED)
 
 find_package(catkin REQUIRED COMPONENTS
-  visp_ros REQUIRED
   VISP REQUIRED
   geometry_msgs
   std_msgs
@@ -21,7 +20,6 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   roscpp
   rospy
-  visp_ros
   visp_bridge
 
   pcl_ros
@@ -66,7 +64,6 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${VISP_INCLUDE_DIRS}
-  ${visp_ros_INCLUDE_DIRS}
 
   ${PCL_INCLUDE_DIRS}
 )

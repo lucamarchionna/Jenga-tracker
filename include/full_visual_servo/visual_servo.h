@@ -71,7 +71,7 @@ class visual_servoing
         void init_startLoop();
         void init_shortLoop();
         void learning_process();
-        void reinit_vs();
+        void reinit_vs(vpHomogeneousMatrix cMo_copy);
         void detection_process();
         void learningCallback(const std_msgs::Bool::ConstPtr& msg);
         void forceCallback(const std_msgs::BoolConstPtr& retract_call);
