@@ -902,20 +902,21 @@ void visual_servoing::learning_process()
       vpThetaUVector bTee_tu = bTee.getThetaUVector();
 
       vpThetaUVector cMo_tu = cMo.getThetaUVector();
+      vpHomogeneousMatrix cMo_copy = cMo;
       cMo_tu[0] = -(M_PI_2-bTee_tu[1]); 
       cMo_tu[2] = 0; 
-      cMo.insert(cMo_tu);
+      cMo_copy.insert(cMo_tu);
       
-      geometry_msgs::TransformStamped pose_target = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target");
+      geometry_msgs::TransformStamped pose_target = toMoveit(cMo_copy, "camera_color_optical_frame" , "handeye_target");
       br.sendTransform(pose_target);
 
       geometry_msgs::Pose cTo_P;
-      cTo_P = visp_bridge::toGeometryMsgsPose(cMo); 
+      cTo_P = visp_bridge::toGeometryMsgsPose(cMo_copy); 
       trackerEstimation.publish(cTo_P);
 
       if (!tracking_failed) {
         cMo_old = cMo;
-        geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2");
+        geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo_copy, "camera_color_optical_frame" , "handeye_target2");
         br_static.sendTransform(pose_target2);  
       }
 
@@ -1160,22 +1161,22 @@ void visual_servoing::detection_process()
       vpThetaUVector bTee_tu = bTee.getThetaUVector();
 
       vpThetaUVector cMo_tu = cMo.getThetaUVector();
+      vpHomogeneousMatrix cMo_copy = cMo;
       cMo_tu[0] = -(M_PI_2-bTee_tu[1]); 
       cMo_tu[2] = 0; 
-      cMo.insert(cMo_tu);
+      cMo_copy.insert(cMo_tu);
 
-      geometry_msgs::TransformStamped pose_target = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target");
+      geometry_msgs::TransformStamped pose_target = toMoveit(cMo_copy, "camera_color_optical_frame" , "handeye_target");
       br.sendTransform(pose_target);
 
       geometry_msgs::Pose cTo_P;
-      cTo_P = visp_bridge::toGeometryMsgsPose(cMo); 
+      cTo_P = visp_bridge::toGeometryMsgsPose(cMo_copy); 
       trackerEstimation.publish(cTo_P);
 
       if (initialize_visualservoing) {
         estimationCallback(cTo_P);
       }
       
-
       if (run_completed && retract && go_to_service) {
         ROS_INFO("Subscribing to service...");
         ros::service::waitForService("/ForceBasedDecision"); 
