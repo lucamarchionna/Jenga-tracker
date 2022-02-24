@@ -23,10 +23,11 @@ visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh), s(vpFea
   init_startLoop();
   ROS_INFO_STREAM("Start loop");
 
-  for(int i=0;i<4 && node_handle.ok();i++){
+  for(int i=0;i<16 && node_handle.ok();i++){
     
     init_shortLoop();
-    ROS_INFO_STREAM("Continue loop");    
+    ROS_INFO_STREAM("Continue loop");  
+    ros::Duration(4.0).sleep();      
 
     learning_process();
 
@@ -369,7 +370,8 @@ void visual_servoing::init_startLoop()
 
   _posx = 100; _posy = 50;
   d1.init(I_color, _posx, _posy, "Color stream");
-  d2.init(I_depth_color, _posx, _posy + I_gray.getHeight()+10, "Depth stream");
+  if (opt_display_depth)
+    d2.init(I_depth_color, _posx, _posy + I_gray.getHeight()+10, "Depth stream");
 
   geometry_msgs::PoseStamped default_pose;
   default_pose.pose.position.x = 0.1;
@@ -442,11 +444,13 @@ void visual_servoing::init_shortLoop()
 
     vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
     vpImageConvert::convert(I_depth_gray,I_depth_color);
-    vpDisplay::display(I_depth_color);
-    vpDisplay::displayText(I_depth_color, 20, 20, "Click when ready.", vpColor::red);
-    vpDisplay::flush(I_depth_color);
-    if (vpDisplay::getClick(I_depth_color, false))
-      break;
+    if (opt_display_depth){
+      vpDisplay::display(I_depth_color);
+      vpDisplay::displayText(I_depth_color, 20, 20, "Click when ready.", vpColor::red);
+      vpDisplay::flush(I_depth_color);
+      if (vpDisplay::getClick(I_depth_color, false))
+        break;
+    }
   }
 
   bool found_top = false;
@@ -737,7 +741,8 @@ void visual_servoing::learning_process()
       vpDisplay::display(I_color);
       vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
       vpImageConvert::convert(I_depth_gray, I_depth_color);
-      vpDisplay::display(I_depth_color);
+      if (opt_display_depth)      
+        vpDisplay::display(I_depth_color);
 
       mapOfImages["Camera1"] = &I_color;
       mapOfPointclouds["Camera2"] = &pointcloud;
@@ -747,9 +752,27 @@ void visual_servoing::learning_process()
       try {
         tracker->track(mapOfImages, mapOfPointclouds, mapOfWidths, mapOfHeights);
       } catch (const vpException &e) {
+        // {
+        //   std::stringstream ss;
+        //   ss << "Tracking failed: " << e.getStringMessage(); 
+        //   vpDisplay::displayText(I_color, 0, 20, ss.str(), vpColor::red);
+        // }        
         std::cout << "Tracker exception: " << e.getStringMessage() << std::endl;
         tracking_failed = true;
       }
+
+      // Check tracking errors
+      double proj_error = tracker->getProjectionError();
+      if (proj_error > opt_proj_error_threshold) {              
+        std::cout << "Tracker needs to restart (projection error detected: " << proj_error << ")" << std::endl;
+        tracking_failed = true;
+      }      
+
+      {
+        std::stringstream ss;
+        ss << "Proj error: " << proj_error << std::endl;
+        vpDisplay::displayText(I_color, 0, 20, ss.str(), vpColor::red);
+      } 
 
       // Get object pose
       if (!tracking_failed) {
@@ -759,8 +782,129 @@ void visual_servoing::learning_process()
       else {
         cMo = cMo_old;
       }
+
+      // Display tracking results
+      if (!tracking_failed) {
+        vpDisplay::displayText(I_color, 20, 20, "Left click: learn. Righ:quit", vpColor::red);
+        // Turn display features on
+        if (opt_display_features){
+          tracker->setDisplayFeatures(opt_display_features);
+          {
+            std::stringstream ss;
+            ss << "Nb features: " << tracker->getError().size();
+            vpDisplay::displayText(I_color, I_color.getHeight() - 50, 20, ss.str(), vpColor::red);
+          }
+          {
+            std::stringstream ss;
+            ss << "Features: edges " << tracker->getNbFeaturesEdge()
+              << ", klt " << tracker->getNbFeaturesKlt()
+              << ", depth " << tracker->getNbFeaturesDepthDense();
+            vpDisplay::displayText(I_color, I_color.getHeight() - 30, 20, ss.str(), vpColor::red);
+          }
+        }
+
+        {
+          std::stringstream ss;
+          if (!times_vec.empty()){
+            ss << "Mean fps:" << 1.0/vpMath::getMean(times_vec); 
+            vpDisplay::displayText(I_color, I_color.getHeight() - 80, 20, ss.str(), vpColor::red);
+          }
+        }        
+
+        // Display model
+        if (opt_display_model )
+          tracker->display(I_color, I_depth_color, cMo, depth_M_color*cMo, cam_color, cam_depth, vpColor::green, 1);
         
-      // Publish object pose
+        // Display frames
+        vpDisplay::displayFrame(I_color, cMo, cam_color, 0.05, vpColor::none, 3);
+        if (opt_display_depth)
+          vpDisplay::displayFrame(I_depth_color, depth_M_color*cMo, cam_depth, 0.05, vpColor::none, 3);
+      }
+      
+      vpDisplay::flush(I_color);
+
+      if (opt_display_depth)
+        vpDisplay::flush(I_depth_color);
+
+      vpMouseButton::vpMouseButtonType button;
+      if (vpDisplay::getClick(I_color, button, false)) {
+        if (button == vpMouseButton::button3) {
+          quit = true;
+       
+        }
+        else if (button == vpMouseButton::button1)
+          learn_position = true;
+      }
+
+      //Rotating base to learn from it
+      if (!rotated && !tracking_failed) {
+        ros::Duration(2.0).sleep();        
+
+      // SERVO SEND ANGLE
+        vpThetaUVector cTo_tu = cMo.getThetaUVector();
+        tracker_visp::angle_velocity angleVel_to_servo;
+        angleVel_to_servo.velocity = 0.003; //degrees/ms, velocity slow
+        if (cTo_tu[1]<0){	//radians, "right face seen from camera"
+          angleVel_to_servo.angle = 135;	//degrees, final angle
+          servoPub.publish(angleVel_to_servo);
+        }
+        else {	//radians, "left face seen from camera"
+          angleVel_to_servo.angle = 45;	//degrees, final angle
+          servoPub.publish(angleVel_to_servo);
+        } 
+        rotated = true;
+        geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2"); //initial estimation
+        br_static.sendTransform(pose_target2);  
+      }
+      
+      if (learn_position) {
+        learn_position = false;
+        if (!tracking_failed){
+          double train_t = vpTime::measureTimeMs();
+
+          learn_cpt ++;
+
+          // Detect keypoints on the current image
+          std::vector<cv::KeyPoint> trainKeyPoints;
+          keypoint.detect(I_color, trainKeyPoints);
+
+          // Keep only keypoints on the object
+          std::vector<vpPolygon> polygons;
+          std::vector<std::vector<vpPoint> > roisPt;
+          std::pair<std::vector<vpPolygon>, std::vector<std::vector<vpPoint> > > pair = tracker->getPolygonFaces();
+          polygons = pair.first;
+          roisPt = pair.second;
+
+          // Compute the 3D coordinates
+          std::vector<cv::Point3f> points3f;
+          vpKeyPoint::compute3DForPointsInPolygons(cMo, cam_color, trainKeyPoints, polygons, roisPt, points3f);
+
+          // Build the reference keypoints
+          keypoint.buildReference(I_color, trainKeyPoints, points3f, true, learn_id++);
+
+          // Display saved learned image
+          if (((learn_cpt-1)%4)==0){
+            ILearned.insert(I_color,vpImagePoint(0,0));
+          }
+          else if (((learn_cpt-1)%4)==1){
+            ILearned.insert(I_color,vpImagePoint(0,I_color.getWidth()));
+          }
+          else if (((learn_cpt-1)%4)==2){
+            ILearned.insert(I_color,vpImagePoint(I_color.getHeight(),0)); 
+          }
+          else if (((learn_cpt-1)%4)==3){
+            ILearned.insert(I_color,vpImagePoint(I_color.getHeight(),I_color.getWidth())); 
+          }
+          vpDisplay::display(ILearned);
+          vpDisplay::flush(ILearned);
+
+          std::cout << "Data learned" << std::endl;
+
+          train_t_vec.push_back(vpTime::measureTimeMs() - train_t);
+        }
+      }
+
+      // Modify and publish object pose
       geometry_msgs::Pose forward_IK = move_group.getCurrentPose("edo_link_ee").pose;
       bTee = visp_bridge::toVispHomogeneousMatrix(forward_IK); 
       vpThetaUVector bTee_tu = bTee.getThetaUVector();
@@ -783,129 +927,9 @@ void visual_servoing::learning_process()
         br_static.sendTransform(pose_target2);  
       }
 
-      // Check tracking errors
-      double proj_error = tracker->getProjectionError();
-      if (proj_error > opt_proj_error_threshold) {
-        std::cout << "Tracker needs to restart (projection error detected: " << proj_error << ")" << std::endl;
-        tracking_failed = true;
-      }
-
-      // Display tracking results
-      if (!tracking_failed) {
-        // Turn display features on
-        if (opt_display_features){
-          tracker->setDisplayFeatures(opt_display_features);
-          {
-            std::stringstream ss;
-            ss << "Nb features: " << tracker->getError().size();
-            vpDisplay::displayText(I_color, I_color.getHeight() - 50, 20, ss.str(), vpColor::red);
-          }
-          {
-            std::stringstream ss;
-            ss << "Features: edges " << tracker->getNbFeaturesEdge()
-              << ", klt " << tracker->getNbFeaturesKlt()
-              << ", depth " << tracker->getNbFeaturesDepthDense();
-            vpDisplay::displayText(I_color, I_color.getHeight() - 30, 20, ss.str(), vpColor::red);
-          }
-        }
-
-        // Display model
-        if (opt_display_model)
-          tracker->display(I_color, I_depth_color, cMo, depth_M_color*cMo, cam_color, cam_depth, vpColor::green, 1);
-        
-        // Display frames
-        vpDisplay::displayFrame(I_color, cMo, cam_color, 0.05, vpColor::none, 3);
-        vpDisplay::displayFrame(I_depth_color, depth_M_color*cMo, cam_depth, 0.05, vpColor::none, 3);
-
-      }
-
-      vpMouseButton::vpMouseButtonType button;
-      
-      vpDisplay::flush(I_color);
-
-      vpDisplay::flush(I_depth_color);
-
-      if (vpDisplay::getClick(I_color, button, false)) {
-        if (button == vpMouseButton::button3) {
-          quit = true;
-       
-        }
-
-        else if (button == vpMouseButton::button1)
-          learn_position = true;
-      }
-
       // Loop time
       loop_t = vpTime::measureTimeMs() - t;
       times_vec.push_back(loop_t);
-
-      //Rotating base to learn from it
-      if (!rotated && !tracking_failed) {
-        ros::Duration(2.0).sleep();        
-
-      // SERVO SEND ANGLE
-        vpThetaUVector cTo_tu = cMo.getThetaUVector();
-        tracker_visp::angle_velocity angleVel_to_servo;
-        angleVel_to_servo.velocity = 0.003; //degrees/ms, velocity slow
-        if (cTo_tu[1]<0){	//radians, "right face seen from camera"
-          angleVel_to_servo.angle = 130;	//degrees, final angle
-          servoPub.publish(angleVel_to_servo);
-        }
-        else {	//radians, "left face seen from camera"
-          angleVel_to_servo.angle = 50;	//degrees, final angle
-          servoPub.publish(angleVel_to_servo);
-        } 
-        rotated = true;
-        geometry_msgs::TransformStamped pose_target2 = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target2"); //initial estimation
-        br_static.sendTransform(pose_target2);  
-      }
-      
-      if (learn_position) {
-        double train_t = vpTime::measureTimeMs();
-
-        learn_cpt ++;
-
-        // Detect keypoints on the current image
-        std::vector<cv::KeyPoint> trainKeyPoints;
-        keypoint.detect(I_color, trainKeyPoints);
-
-        // Keep only keypoints on the object
-        std::vector<vpPolygon> polygons;
-        std::vector<std::vector<vpPoint> > roisPt;
-        std::pair<std::vector<vpPolygon>, std::vector<std::vector<vpPoint> > > pair = tracker->getPolygonFaces();
-        polygons = pair.first;
-        roisPt = pair.second;
-
-        // Compute the 3D coordinates
-        std::vector<cv::Point3f> points3f;
-        vpKeyPoint::compute3DForPointsInPolygons(cMo, cam_color, trainKeyPoints, polygons, roisPt, points3f);
-
-        // Build the reference keypoints
-        keypoint.buildReference(I_color, trainKeyPoints, points3f, true, learn_id++);
-
-        // Display saved learned image
-        if (((learn_cpt-1)%4)==0){
-          ILearned.insert(I_color,vpImagePoint(0,0));
-        }
-        else if (((learn_cpt-1)%4)==1){
-          ILearned.insert(I_color,vpImagePoint(0,I_color.getWidth()));
-        }
-        else if (((learn_cpt-1)%4)==2){
-          ILearned.insert(I_color,vpImagePoint(I_color.getHeight(),0)); 
-        }
-        else if (((learn_cpt-1)%4)==3){
-          ILearned.insert(I_color,vpImagePoint(I_color.getHeight(),I_color.getWidth())); 
-        }
-        vpDisplay::display(ILearned);
-        vpDisplay::flush(ILearned);
-
-        learn_position = false;
-        std::cout << "Data learned" << std::endl;
-
-        train_t_vec.push_back(vpTime::measureTimeMs() - train_t);
-      }
-
-
 
     }
 
@@ -998,7 +1022,8 @@ void visual_servoing::detection_process()
       vpDisplay::display(I_color);
       vpImageConvert::createDepthHistogram(I_depth_raw, I_depth_gray);
       vpImageConvert::convert(I_depth_gray, I_depth_color);
-      vpDisplay::display(I_depth_color);
+      if (opt_display_depth)
+        vpDisplay::display(I_depth_color);
 
       mapOfImages["Camera1"] = &I_color;
       mapOfPointclouds["Camera2"] = &pointcloud;
@@ -1032,7 +1057,8 @@ void visual_servoing::detection_process()
         } 
         else {
           vpDisplay::flush(I_color);
-          vpDisplay::flush(I_depth_color);
+          if (opt_display_depth)
+            vpDisplay::flush(I_depth_color);
           //Keep searching
           continue;
         }
@@ -1053,10 +1079,31 @@ void visual_servoing::detection_process()
         }   
       catch (const vpException &e) {
         std::cout << "Tracker exception: " << e.getStringMessage() << std::endl;
+        // {
+        //   std::stringstream ss;
+        //   ss << "Tracking failed: " << e.getStringMessage(); 
+        //   vpDisplay::displayText(I_color, 0, 20, ss.str(), vpColor::black);
+        // }           
         tracking_failed = true;
         run_auto_init = true;
         // }
       }
+
+      // Check tracking errors
+      double proj_error = tracker->getProjectionError();
+
+      if (proj_error > opt_proj_error_threshold) {
+        std::cout << "Tracker needs to restart (projection error detected: " << proj_error << ")" << std::endl;
+        run_auto_init = true;
+        tracking_failed = true;
+      }     
+
+      // Display proj error
+      {
+        std::stringstream ss;
+        ss << "Proj error: " << proj_error << std::endl;
+        vpDisplay::displayText(I_color, 0, 20, ss.str(), vpColor::red);
+      }         
 
       // Get and publish object pose
       // Get object pose
@@ -1074,7 +1121,58 @@ void visual_servoing::detection_process()
 
       else {
         cMo = cMo_old;
+      }    
+
+            // Display tracking results
+      if (!tracking_failed) {
+        vpDisplay::displayText(I_color, 20, 20, "Left click: detect. Righ:quit", vpColor::red);
+        // Turn display features on
+        if (opt_display_features){
+          tracker->setDisplayFeatures(opt_display_features);
+          {
+            std::stringstream ss;
+            ss << "Nb features: " << tracker->getError().size();
+            vpDisplay::displayText(I_color, I_color.getHeight() - 50, 20, ss.str(), vpColor::red);
+          }
+          {
+            std::stringstream ss;
+            ss << "Features: edges " << tracker->getNbFeaturesEdge()
+              << ", klt " << tracker->getNbFeaturesKlt()
+              << ", depth " << tracker->getNbFeaturesDepthDense();
+            vpDisplay::displayText(I_color, I_color.getHeight() - 30, 20, ss.str(), vpColor::red);
+          }
+        }
+
+        {
+          std::stringstream ss;
+          if (!times_vec.empty()){
+            ss << "Mean fps:" << 1.0/vpMath::getMean(times_vec); 
+            vpDisplay::displayText(I_color, I_color.getHeight() - 80, 20, ss.str(), vpColor::red);
+          }
+        }   
+
+        // Display model
+        if (opt_display_model)
+          tracker->display(I_color, I_depth_color, cMo, depth_M_color*cMo, cam_color, cam_depth, vpColor::green, 1);
+        // Display frames
+        vpDisplay::displayFrame(I_color, cMo, cam_color, 0.05, vpColor::none, 3);
+        if (opt_display_depth)
+          vpDisplay::displayFrame(I_depth_color, depth_M_color*cMo, cam_depth, 0.05, vpColor::none, 3);
       }
+      
+      vpDisplay::flush(I_color);
+
+      if (opt_display_depth)
+        vpDisplay::flush(I_depth_color);
+
+      vpMouseButton::vpMouseButtonType button;
+      if (vpDisplay::getClick(I_color, button, false)) {
+        if (button == vpMouseButton::button3) {
+          quit = true;
+        } else if (button == vpMouseButton::button1) {
+          run_auto_init = true;
+        }
+      } 
 
       geometry_msgs::Pose forward_IK = move_group.getCurrentPose("edo_link_ee").pose;
       bTee = visp_bridge::toVispHomogeneousMatrix(forward_IK); 
@@ -1129,59 +1227,6 @@ void visual_servoing::detection_process()
         }
         go_to_service = false;
 
-      }
-      
-
-      // Check tracking errors
-      double proj_error = tracker->getProjectionError();
-
-      if (proj_error > opt_proj_error_threshold) {
-        std::cout << "Tracker needs to restart (projection error detected: " << proj_error << ")" << std::endl;
-        run_auto_init = true;
-        tracking_failed = true;
-      }
-
-      // Display tracking results
-      if (!tracking_failed) {
-        // Turn display features on
-        if (opt_display_features){
-          tracker->setDisplayFeatures(opt_display_features);
-          {
-            std::stringstream ss;
-            ss << "Nb features: " << tracker->getError().size();
-            vpDisplay::displayText(I_color, I_color.getHeight() - 50, 20, ss.str(), vpColor::red);
-          }
-          {
-            std::stringstream ss;
-            ss << "Features: edges " << tracker->getNbFeaturesEdge()
-              << ", klt " << tracker->getNbFeaturesKlt()
-              << ", depth " << tracker->getNbFeaturesDepthDense();
-            vpDisplay::displayText(I_color, I_color.getHeight() - 30, 20, ss.str(), vpColor::red);
-          }
-        }
-
-        // Display model
-        if (opt_display_model)
-          tracker->display(I_color, I_depth_color, cMo, depth_M_color*cMo, cam_color, cam_depth, vpColor::green, 1);
-        
-        // Display frames
-        vpDisplay::displayFrame(I_color, cMo, cam_color, 0.05, vpColor::none, 3);
-        vpDisplay::displayFrame(I_depth_color, depth_M_color*cMo, cam_depth, 0.05, vpColor::none, 3);
-
-      }
-
-      vpMouseButton::vpMouseButtonType button;
-      
-      vpDisplay::flush(I_color);
-
-      vpDisplay::flush(I_depth_color);
-
-      if (vpDisplay::getClick(I_color, button, false)) {
-        if (button == vpMouseButton::button3) {
-          quit = true;
-        } else if (button == vpMouseButton::button1) {
-          run_auto_init = true;
-        }
       }
 
       // Loop time

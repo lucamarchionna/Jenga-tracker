@@ -168,6 +168,7 @@ class visual_servoing
         double opt_learn, opt_auto_init, opt_proj_error_threshold{35.0}, opt_setGoodME_thresh{0.4};
         int opt_disp_visibility{0}, width{640}, height{480}, fps{30}, run_iter{0};
         bool opt_display_projection_error{false}, opt_display_features{false}, opt_display_model{true}, opt_yolact_init{true}, opt_pose_init{true}, learn_position{true}, rotated{false}, f_max{false}, run_completed{false}, opt_use_depth{false};
+        bool opt_display_depth{false};
         vpRotationMatrix cdRo;
         vpKeyPoint keypoint;
         vpMbGenericTracker *tracker;

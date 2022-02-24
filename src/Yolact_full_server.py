@@ -476,7 +476,7 @@ class Yolact_full_service():
       img_all_masks+=block.draw_masked_approx(img)
     
     cv2.putText(img_all_masks,"Detected"+str(len(masks)),(20,20),cv2.FONT_HERSHEY_PLAIN,1,[0,255,0])
-    cv2.putText(img_all_masks,"Block: "+str(layer)+" "+position+" "+orientation,(100,20),cv2.FONT_HERSHEY_PLAIN,1,[0,255,0])
+    cv2.putText(img_all_masks,"Block: "+str(layer)+" "+position+" "+orientation,(20,60),cv2.FONT_HERSHEY_PLAIN,1,[0,255,0])
 
     # %%
     if len(blocks_list)<0:
