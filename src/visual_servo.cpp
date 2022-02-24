@@ -499,7 +499,11 @@ void visual_servoing::init_shortLoop()
     }
   }
 
+<<<<<<< HEAD
   pub_cartesian.publish(default_pose);
+=======
+  pub_cartesian.publish(default_pose); 
+>>>>>>> d590bcdd17d0d05cd1df51f73e51ddb5466b9525
 
   tracker = new vpMbGenericTracker(trackerTypes);
   
