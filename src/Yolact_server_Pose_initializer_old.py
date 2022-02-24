@@ -72,8 +72,10 @@ def to_YolactInitializeCaoPoseResponse(cao_path,rvec=None,tvec=None,position=Non
 class Yolact_pose_service():
   def __init__(self):
     self.msg_image=None
-    self.width=480
-    self.height=480
+    # self.width=480
+    # self.height=480
+    self.width=720
+    self.height=720
     self.img_imshow=np.zeros((self.width,self.height*2,3),dtype=np.uint8)
     #Init stuff to enable loop
     self.newImage=False
@@ -152,7 +154,8 @@ class Yolact_pose_service():
     ### CROP IMAGE TO BE SQUARE
     hhh,www,_=color_image.shape
     width_offset=int(www-hhh)/2
-    img=color_image[int(hhh/2)-240:int(hhh/2)+240,int(www/2)-240:int(www/2)+240]
+    # img=color_image[int(hhh/2)-240:int(hhh/2)+240,int(www/2)-240:int(www/2)+240]
+    img=color_image[int(hhh/2)-self.height/2:int(hhh/2)+self.height/2,int(www/2)-self.width/2:int(www/2)+self.width/2]
 
     # %%
     # Detection

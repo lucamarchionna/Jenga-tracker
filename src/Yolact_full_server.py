@@ -112,10 +112,14 @@ def to_RestartFirstLayerResponse(found_top):
 class Yolact_full_service():
   def __init__(self):
     self.msg_image=None
-    self.cam_width=640
-    self.cam_height=480    
-    self.width=480
-    self.height=480
+    # self.cam_width=640
+    # self.cam_height=480    
+    # self.width=480
+    # self.height=480
+    self.cam_width=1280
+    self.cam_height=720    
+    self.width=720
+    self.height=720    
     self.pose_window_name="-POSE-:c:choose,esc:exit"   
     self.pose_imshow=np.zeros((self.width,self.height*2,3),dtype=np.uint8)
     self.init_window_name="-INIT-:c:choose,esc:exit"
@@ -184,7 +188,8 @@ class Yolact_full_service():
     ### CROP IMAGE TO BE SQUARE
     hhh,www,_=color_image.shape
     width_offset=int(www-hhh)/2
-    img=color_image[int(hhh/2)-240:int(hhh/2)+240,int(www/2)-240:int(www/2)+240]
+    # img=color_image[int(hhh/2)-240:int(hhh/2)+240,int(www/2)-240:int(www/2)+240]
+    img=color_image[int(hhh/2)-self.height/2:int(hhh/2)+self.height/2,int(www/2)-self.width/2:int(www/2)+self.width/2]
     self.first_imshow=np.hstack((img,np.zeros((self.height,self.width,3),dtype=np.uint8),np.zeros((self.height,self.width,3),dtype=np.uint8)))    
 
     # %%
@@ -301,9 +306,9 @@ class Yolact_full_service():
 
     #Draw frame axes on image
     img_big=np.zeros((self.cam_height,self.cam_width,3),dtype=np.uint8)
-    img_big[:,80:560]=img_all_masks.copy()
+    img_big[:,width_offset:self.cam_width-width_offset]=img_all_masks.copy()
     img_big=cv2.drawFrameAxes(img_big,cam_mtx,cam_dist,rvec_first,tvec_first,0.03,thickness=3)
-    self.first_imshow=np.hstack((img,img_big[:,80:560],top_masks))
+    self.first_imshow=np.hstack((img,img_big[:,width_offset:self.cam_width-width_offset],top_masks))
 
     first_layer_number=18
 
@@ -497,10 +502,10 @@ class Yolact_full_service():
     #####################
 
     #Draw estimated block pose on image
-    img_big=np.zeros((480,640,3),dtype=np.uint8)
-    img_big[:,80:560]=img_all_masks.copy()
+    img_big=np.zeros((self.cam_height,self.cam_width,3),dtype=np.uint8)
+    img_big[:,width_offset:self.cam_width-width_offset]=img_all_masks.copy()
     img_big=cv2.drawFrameAxes(img_big,cam_mtx,cam_dist,rvec_est,tvec_est,0.03,thickness=2)
-    img_all_masks=img_big[:,80:560].copy()
+    img_all_masks=img_big[:,width_offset:self.cam_width-width_offset].copy()
     self.pose_imshow=np.hstack((img,img_all_masks))
 
     print("Search from policy")
@@ -580,9 +585,9 @@ class Yolact_full_service():
     tvec,rvec=chosen_blocks_group.initPose_file_write(width_offset,initPose_file_name,cam_mtx,cam_dist)
     #Draw frame axes on image
     img_big=np.zeros(color_image.shape,dtype=np.uint8)
-    img_big[:,80:560]=masked_group.copy()
+    img_big[:,width_offset:self.cam_width-width_offset]=masked_group.copy()
     img_big=cv2.drawFrameAxes(img_big,cam_mtx,cam_dist,rvec,tvec,0.04,thickness=2)
-    self.pose_imshow=np.hstack((img_all_masks,img_big[:,80:560]))
+    self.pose_imshow=np.hstack((img_all_masks,img_big[:,width_offset:self.cam_width-width_offset]))
     # %%
     rospy.loginfo("---\nSUCCESFULLY ENDED\n---")
     self.in_pose_service=False
