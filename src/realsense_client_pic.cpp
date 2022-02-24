@@ -26,13 +26,12 @@ int main(int argc, char *argv[])
 	// ros::Rate loop_rate(10);
   ros::ServiceClient client = node.serviceClient<tracker_visp::YolactInitializeCaoPose>("/YolactInitializeCaoPose");
 
-
   std::string model_cao = "";
   vpHomogeneousMatrix cMo;
 
   // [Realsense camera configuration]
   vpRealSense2 realsense;
-  int width = 640, height = 480;
+  int width = 1280, height = 720;
   int fps = 30;
   rs2::config config;
   config.enable_stream(RS2_STREAM_COLOR, width, height, RS2_FORMAT_RGBA8, fps);
