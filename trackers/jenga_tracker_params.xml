@@ -57,7 +57,7 @@
   </face>
   <lod>
     <!-- General lod parameters, may be overwritten by .cao model -->
-    <use_lod>1</use_lod>
+    <use_lod>0</use_lod>
     <!-- <min_line_length_threshold>100</min_line_length_threshold> -->
     <min_polygon_area_threshold>300</min_polygon_area_threshold> 
   </lod>

@@ -154,7 +154,7 @@ class visual_servoing
         //positionbased_vs::InitialGuess service;
         double threshold, threshold_pose{0.10};
         double vitesse;
-        double rapport;
+        double rapport, zig_zag[4]{0.007, 0.0, -0.007, 0.00};
         bool block_axis{false}, take_cTo{true}, retract{false}, go_to_service{true};
         float signPoseReceived{1.0}, signPullX{1.0}, distance_run{0.1};
         vpColVector v_ee(unsigned int n), omega_ee(unsigned int n), v_cam, v(unsigned int n), e1, proj_e1;
@@ -165,8 +165,8 @@ class visual_servoing
         
         
         ros::Publisher pub, lastPose, pub_cartesian;
-        double opt_learn, opt_auto_init, opt_proj_error_threshold{25.0}, opt_setGoodME_thresh{0.4};
-        int opt_disp_visibility{0}, width{640}, height{480}, fps{30};
+        double opt_learn, opt_auto_init, opt_proj_error_threshold{35.0}, opt_setGoodME_thresh{0.4};
+        int opt_disp_visibility{0}, width{640}, height{480}, fps{30}, run_iter{0};
         bool opt_display_projection_error{false}, opt_display_features{false}, opt_display_model{true}, opt_yolact_init{true}, opt_pose_init{true}, learn_position{true}, rotated{false}, f_max{false}, run_completed{false}, opt_use_depth{false};
         vpRotationMatrix cdRo;
         vpKeyPoint keypoint;
