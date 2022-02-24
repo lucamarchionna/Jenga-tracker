@@ -496,8 +496,7 @@ void visual_servoing::init_shortLoop()
     }
   }
 
-  pub_cartesian.publish(default_pose);
-  ros::Duration(4.0).sleep(); 
+  pub_cartesian.publish(default_pose); 
 
   tracker = new vpMbGenericTracker(trackerTypes);
   
