@@ -1,9 +1,18 @@
 <?xml version="1.0" ?>
 <launch>
+    <arg name="X_6toc" value="0.057" />
+    <arg name="Y_6toc" value="-0.0328" />
 
-    <!-- Define relation between camera and end-effector -->
-    <node pkg="tf2_ros" type="static_transform_publisher" name="ee2cam"
-        args="-0.052 0.032 0.0 0 0 -0.7071068 0.7071068 edo_link_6 camera_color_optical_frame" />       
-        
-    <node name="tracker" pkg="tracker_visp" type="detection" output="screen" />
+    <param name="X_extr_value" type = "double" value="$(eval -1.0*arg('Y_6toc'))"/>
+    <param name="Y_extr_value" type = "double" value="$(arg X_6toc)"/>
+
+    <node pkg="tracker_visp" type="Yolact_full_server.py" name="full_segmentation" />
+    
+    <node pkg="tracker_visp" type="visualServo" name="pbvs_node" respawn="true" output = "screen">
+        <param name="X_extr" value="$(eval -1.0*arg('Y_6toc'))" />
+        <param name="Y_extr" value="$(arg X_6toc)" />
+    </node>
+
+    <!-- <node pkg="jenga_policy" type="policy_shortTower.py" name="policy" output="screen"/> -->
+
 </launch>

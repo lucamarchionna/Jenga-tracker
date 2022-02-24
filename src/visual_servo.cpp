@@ -358,8 +358,8 @@ void visual_servoing::init_startLoop()
   mapOfHeights["Camera2"] = height;
 
   // [Configuration of display]
-  width = 640;
-  height = 480;
+  width = 1280;
+  height = 720;
   fps = 30;
   
   I_color.init(height, width);
@@ -376,6 +376,9 @@ void visual_servoing::init_startLoop()
   geometry_msgs::PoseStamped default_pose;
   default_pose.pose.position.x = 0.1;
   default_pose.pose.position.z = 0.7;
+
+  node_handle.getParam("/pbvs_node/X_extr", X_extr);
+  node_handle.getParam("/pbvs_node/Y_extr", Y_extr);
 
 
   // [Acquire stream and initialize displays]
@@ -497,7 +500,6 @@ void visual_servoing::init_shortLoop()
   }
 
   pub_cartesian.publish(default_pose);
-  ros::Duration(4.0).sleep(); 
 
   tracker = new vpMbGenericTracker(trackerTypes);
   
@@ -546,7 +548,7 @@ void visual_servoing::reinit_vs(vpHomogeneousMatrix cMo_copy) {
 
   vpTranslationVector cdto;
   translX = translX - translX_policy;  //the correct one is x = -0.0035;
-  translY = 0.057;  //the correct one is y = 0.053;
+  translY = Y_extr;  //the correct one is y = 0.053;
   translZ = 0.25;   //the correct one is z = 0.134
 
   cdto.buildFrom(translX, translY, translZ);
@@ -588,9 +590,12 @@ int visual_servoing::init_matrices()
   translX_policy = 0;
 
   vpTranslationVector cdto;
-  translX = 0.0328 - translX_policy;  //the correct one is x = -0.0035;
-  translY = 0.0572;  //the correct one is y = 0.053;
+  translX = X_extr - translX_policy;  //the correct one is x = -0.0035;
+  translY = Y_extr;  //the correct one is y = 0.053;
   translZ = 0.25;   //the correct one is z = 0.134
+
+  cout << "params service gives a translX: " << translX << endl;
+  cout << "params service gives a translY: " << translY << endl;
 
   cdto.buildFrom(translX, translY, translZ);
   vpRotationMatrix cdRo{1, 0, 0,
