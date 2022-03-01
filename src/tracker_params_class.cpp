@@ -86,15 +86,15 @@ void tracking::init_parameters()
   //Settings  
   tracker_path = ros::package::getPath("tracker_visp");
   opt_config = tracker_path + "/trackers/jenga_tracker_params.xml";
-  opt_model = tracker_path + "/model/file_cao.cao";
+  opt_model = tracker_path + "/model/jenga_single.cao";
   opt_init = tracker_path + "/model/jenga_single.init";
-  opt_init_pos= tracker_path + "/model/file_init.pos";
   opt_learning_data = tracker_path + "/learning/1/data-learned.bin";
   opt_keypoint_config = tracker_path + "/learning/keypoint_config.xml";
   opt_learn = true;
   opt_auto_init = false;
-  opt_pose_init = true;
+  opt_init_clicks = true;
   learn_position = false;
+  opt_yolact_init = false;
 
   // [Realsense camera configuration]
   config.enable_stream(RS2_STREAM_COLOR, width, height, RS2_FORMAT_RGBA8, fps);
@@ -167,7 +167,7 @@ void tracking::learning_process()
   
   opt_learn = true;
   opt_auto_init = false; 
-  opt_pose_init = true;
+  opt_init_clicks=true;
   learn_position = false;
 
   // [Map of images to use tracker with depth]
@@ -191,7 +191,7 @@ void tracking::learning_process()
     mapOfImages["Camera1"] = &I_color;
     mapOfImages["Camera2"] = &I_depth_color;
     mapOfInitFiles["Camera1"] = opt_init;
-    mapOfInitPoses["Camera1"] = opt_init_pos;
+    // mapOfInitPoses["Camera1"] = opt_init_pos;
   }
 
   // Define tracker types
@@ -231,23 +231,8 @@ void tracking::learning_process()
   if (opt_learn && !opt_auto_init)
     vpIoTools::makeDirectory(vpIoTools::getParent(opt_learning_data));
 
-  // Load auto learn data, or initialize with clicks
 
-   
-  if (opt_auto_init) {
-    // Preparation for automatic initialization
-    if (!vpIoTools::checkFilename(opt_learning_data)) {
-      std::cout << "Cannot enable auto detection. Learning file \"" << opt_learning_data << "\" doesn't exist" << std::endl;
-      //return EXIT_FAILURE;
-    }
-    keypoint.loadLearningData(opt_learning_data, true);
-    vpImageConvert::convert(I_color, I_gray);
-    keypoint.createImageMatching(I_gray, IMatching);
-    d3.setDownScalingFactor(vpDisplay::SCALE_AUTO);
-    d3.init(IMatching, _posx+I_gray.getWidth()*2+10, _posy, "Detection-from-learned");
-  } 
-
-  else if (opt_yolact_init) {
+  if (opt_yolact_init) {
     // [INITIALIZE WITH YOLACT]
     // [Acquire stream and initialize displays]
     bool terminated = false;
@@ -315,24 +300,15 @@ void tracking::learning_process()
       }
     }
   }
-  else {
-    if (opt_pose_init){
-      // // Initialize from pose file .pos
-      if(opt_use_depth){
-        tracker->initFromPose(mapOfImages,mapOfInitPoses);
-      }
-      else{
-        tracker->initFromPose(I_color,opt_init_pos);
-      }
+  else if(opt_init_clicks){
+    // // Initialize with clicks from .init
+    if(opt_use_depth){
+      tracker->loadModel(opt_model, opt_model);
+      tracker->initClick(mapOfImages, mapOfInitFiles, true);
     }
     else {
-      // // Initialize with clicks from .init
-      if(opt_use_depth){
-        tracker->initClick(mapOfImages, mapOfInitFiles, true);
-      }
-      else {
-        tracker->initClick(I_color, opt_init, true);
-      }
+      tracker->loadModel(opt_model);
+      tracker->initClick(I_color, opt_init, true);
     }
   }
 
@@ -354,16 +330,8 @@ void tracking::learning_process()
   realsense.acquire((unsigned char *) I_color.bitmap, (unsigned char *) I_depth_raw.bitmap, &pointcloud, NULL, NULL);
   vpImageConvert::convert(I_color, I_gray);
 
-
-  // Before the loop
-  bool run_auto_init = false;
-  if (opt_auto_init) {
-    run_auto_init = true;
-  }
-
   std::vector<double> times_vec;
   std::vector<double> train_t_vec;
-  std::vector<double> detect_t_vec;
   
   try {
     
@@ -405,107 +373,24 @@ void tracking::learning_process()
         mapOfHeights["Camera2"] = height;
       }
 
-
-      // Run auto initialization from learned data
-      if (run_auto_init) {
-        tracking_failed = false;
-        double error;
-        double detect_t= vpTime::measureTimeMs();
-        vpImageConvert::convert(I_color, I_gray);
-        keypoint.insertImageMatching(I_gray, IMatching);
-        // DETECTION
-        if (keypoint.matchPoint(I_gray, cam_color, cMo, error, elapsedTime)) {
-          std::cout << "Auto init succeed in elapsed time: " << elapsedTime << " ms" << std::endl;
-          // Show matchings on learned images
-          vpDisplay::display(IMatching);
-          keypoint.displayMatching(I_gray, IMatching);
-          std::stringstream ss;
-          ss << "Number of matchings: " << keypoint.getMatchedPointNumber();
-          vpDisplay::displayText(IMatching, 20, 20, ss.str(), vpColor::red);
-          ss.str("");
-          ss  << "Number of references: " << keypoint.getReferencePointNumber();
-          vpDisplay::displayText(IMatching, 60, 20, ss.str(), vpColor::red);
-          vpDisplay::flush(IMatching);
-          if (opt_use_depth){
-            mapOfCameraPoses["Camera1"] = cMo;
-            mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
-            // Initialize from detection
-            tracker->initFromPose(mapOfImages, mapOfCameraPoses);        
-          }
-          else {
-            tracker->initFromPose(I_color, cMo);
-          }
-          std::cout << "Detection succeed in elapsed time: " << vpTime::measureTimeMs() - detect_t << " ms" << std::endl;
-          detect_t_vec.push_back(vpTime::measureTimeMs() - detect_t);
-        } 
-        else {
-          vpDisplay::flush(I_color);
-          if(opt_use_depth)
-            vpDisplay::flush(I_depth_color);
-          //Keep searching
-          continue;
-        }
-      }
-      else if (tracking_failed) {
-        // Manual init
-        tracking_failed = false;
-        if(opt_use_depth)
-          tracker->initClick(mapOfImages, mapOfInitFiles, true);
-        else
-          tracker->initClick(I_color, opt_init, true);
-      }
-
       // Run the tracker
       try {
-        if (run_auto_init) {
-          // Turn display features off just after auto init to not display wrong moving-edge if the tracker fails
-          tracker->setDisplayFeatures(false);
-          run_auto_init = false;
+        if(opt_use_depth){
+          cout << "---TRACK---" << endl;  
+            tracker->track(mapOfImages, mapOfPointclouds, mapOfWidths, mapOfHeights);
         }
-        if(opt_use_depth)
-          tracker->track(mapOfImages, mapOfPointclouds, mapOfWidths, mapOfHeights);
         else
           tracker->track(I_color);
         } 
         catch (const std::length_error& le){
           std::cerr << "Length error: " << le.what() << '\n';
-          if (opt_auto_init) {
-            //std::cout << "Tracker needs to restart (tracking exception)" << std::endl;
-            run_auto_init = true;
-          }
         }
         catch (const vpException &e) {
           std::cout << "Tracker exception: " << e.getStringMessage() << std::endl;
           tracking_failed = true;
-          if (opt_auto_init) {
-            //std::cout << "Tracker needs to restart (tracking exception)" << std::endl;
-            run_auto_init = true;
-          }
       }
       // Get and publish object pose
       cMo = tracker->getPose();
-
-      geometry_msgs::Pose forward_IK = move_group.getCurrentPose("edo_link_ee").pose;
-      bTee = visp_bridge::toVispHomogeneousMatrix(forward_IK); 
-      vpThetaUVector bTee_tu = bTee.getThetaUVector();
-
-      
-      vpThetaUVector cMo_tu = cMo.getThetaUVector();
-      cMo_tu[0] = -(M_PI_2-bTee_tu[1]); 
-      cMo_tu[2] = 0; 
-      cMo.insert(cMo_tu);
-
-      //cTo = cMo;
-      //q_unit << 0, 0, 0, 1;
-      //cTo.insert(q_unit); //only for simulation
-      geometry_msgs::TransformStamped pose_target = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target");
-      br.sendTransform(pose_target);
-
-      
-      geometry_msgs::Pose cTo_P;
-      cTo_P = visp_bridge::toGeometryMsgsPose(cMo); 
-      trackerEstimation.publish(cTo_P);
-      
 
       // Check tracking errors
       double proj_error = 0;
@@ -516,9 +401,6 @@ void tracking::learning_process()
 
       if (proj_error > opt_proj_error_threshold) {
         std::cout << "Tracker needs to restart (projection error detected: " << proj_error << ")" << std::endl;
-        if (opt_auto_init) {
-            run_auto_init = true;
-          }
         tracking_failed = true;
       }
 
@@ -569,8 +451,6 @@ void tracking::learning_process()
           quit = true;
         } else if (button == vpMouseButton::button1 && opt_learn) {
           learn_position = true;
-        } else if (button == vpMouseButton::button1 && opt_auto_init && !opt_learn) {
-          run_auto_init = true;
         }
       }
       if (opt_use_depth && vpDisplay::getClick(I_depth_color, false)) {
@@ -646,10 +526,27 @@ void tracking::learning_process()
         train_t_vec.push_back(vpTime::measureTimeMs() - train_t);
       }
 
+      geometry_msgs::Pose forward_IK = move_group.getCurrentPose("edo_link_ee").pose;
+      bTee = visp_bridge::toVispHomogeneousMatrix(forward_IK); 
+      vpThetaUVector bTee_tu = bTee.getThetaUVector();
 
+      
+      vpThetaUVector cMo_tu = cMo.getThetaUVector();
+      cMo_tu[0] = -(M_PI_2-bTee_tu[1]); 
+      cMo_tu[2] = 0; 
+      cMo.insert(cMo_tu);
 
+      //cTo = cMo;
+      //q_unit << 0, 0, 0, 1;
+      //cTo.insert(q_unit); //only for simulation
+      geometry_msgs::TransformStamped pose_target = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target");
+      br.sendTransform(pose_target);
+
+      
+      geometry_msgs::Pose cTo_P;
+      cTo_P = visp_bridge::toGeometryMsgsPose(cMo); 
+      trackerEstimation.publish(cTo_P);
     }
-
     //! -----------------------------------------------------------------------------------------------
     //! [END OF LOOP]
     d3.close(ILearned);
@@ -673,10 +570,6 @@ void tracking::learning_process()
     std::cout << "\nTrain:\nProcessing time, Mean: " << vpMath::getMean(train_t_vec) << " ms ; Median: " << vpMath::getMedian(train_t_vec)
               << " ; Std: " << vpMath::getStdev(train_t_vec) << " ms" << std::endl;
     }
-    if (!detect_t_vec.empty()) {
-    std::cout << "\nDetection:\nProcessing time, Mean: " << vpMath::getMean(detect_t_vec) << " ms ; Median: " << vpMath::getMedian(detect_t_vec)
-              << " ; Std: " << vpMath::getStdev(detect_t_vec) << " ms" << std::endl;
-    }
   
   } catch (const vpException &e) {
     std::cout << "Catch an exception: " << e.what() << std::endl;
@@ -695,6 +588,7 @@ void tracking::detection_process()
   opt_learn = false;
   opt_auto_init = true; 
   opt_yolact_init = false;
+  opt_init_clicks= false;
   keypoint.loadLearningData(opt_learning_data, true);
   vpImageConvert::convert(I_color,I_gray);
   keypoint.createImageMatching(I_gray, IMatching);
@@ -717,7 +611,7 @@ void tracking::detection_process()
   mapOfImages["Camera1"] = &I_color;
   mapOfImages["Camera2"] = &I_depth_color;
   mapOfInitFiles["Camera1"] = opt_init;
-  mapOfInitPoses["Camera1"] = opt_init_pos;
+  // mapOfInitPoses["Camera1"] = opt_init_pos;
 
   // [Load all info in the tracker]
   // Define tracker types
@@ -751,42 +645,17 @@ void tracking::detection_process()
     d3.setDownScalingFactor(vpDisplay::SCALE_AUTO);
     d3.init(IMatching, _posx+I_gray.getWidth()*2+10, _posy, "Detection-from-learned");
   } 
-
-  else if (opt_yolact_init) {
-    sensor_msgs::Image sensor_image = visp_bridge::toSensorMsgsImage(I_color);
-	  sensor_msgs::CameraInfo sensor_camInfo = visp_bridge::toSensorMsgsCameraInfo(cam_color,width,height);
-    // Send image and cam par to service, where Python node responds with cao_file and pose
-    ROS_INFO("Subscribing to service...");
-    ros::service::waitForService("/YolactInitializeCaoPose");
-    srv.request.image = sensor_image;
-    srv.request.camInfo = sensor_camInfo;
-    ROS_INFO("Starting call to service..");
-    if (client.call(srv))
-    {
-      ROS_INFO("Response from service..");
-      opt_model=srv.response.caoFilePath.data;
-      geometry_msgs::Pose initPose=srv.response.initPose.pose.pose;
-      cMo=visp_bridge::toVispHomogeneousMatrix(initPose);
-      tracker->loadModel(opt_model, opt_model);
-      mapOfCameraPoses["Camera1"] = cMo;
-      mapOfCameraPoses["Camera2"] = depth_M_color *cMo;
-      tracker->initFromPose(mapOfImages,mapOfCameraPoses);
-    }
-    else{
-      ROS_ERROR("Cannot receive response from server");
-    }
-  }
-
-  else {
-    if (opt_pose_init){
-      // // Initialize from pose file .pos
-      tracker->initFromPose(mapOfImages,mapOfInitPoses);
-    }
-    else {
-      // // Initialize with clicks from .init
-      tracker->initClick(mapOfImages, mapOfInitFiles, true);
-    }
-  }
+  // else {
+  //   if (opt_init_clicks){
+  //     // // Initialize with clicks from .init
+  //     if(opt_use_depth){
+  //       tracker->initClick(mapOfImages, mapOfInitFiles, true);
+  //     }
+  //     else {
+  //       tracker->initClick(I_color, opt_init, true);
+  //     }
+  //   }
+  // }
 
   // Display and error
   tracker->setDisplayFeatures(opt_display_features);
@@ -808,14 +677,10 @@ void tracking::detection_process()
   }
 
   std::vector<double> times_vec;
-  std::vector<double> train_t_vec;
   std::vector<double> detect_t_vec;
   
   try {
     
-    //To be able to display keypoints matching with test-detection-rs2
-    int learn_id = 1;
-    unsigned int learn_cpt = 0;
   
     double loop_t = 0;
     
@@ -893,14 +758,14 @@ void tracking::detection_process()
           continue;
         }
       }
-      else if (tracking_failed) {
-        // Manual init
-        tracking_failed = false;
-        if(opt_use_depth)
-          tracker->initClick(mapOfImages, mapOfInitFiles, true);
-        else
-          tracker->initClick(I_color, opt_init, true);
-      }
+      // else if (tracking_failed) {
+      //   // Manual init
+      //   tracking_failed = false;
+      //   if(opt_use_depth)
+      //     tracker->initClick(mapOfImages, mapOfInitFiles, true);
+      //   else
+      //     tracker->initClick(I_color, opt_init, true);
+      // }
 
       // Run the tracker
       try {
@@ -1029,7 +894,6 @@ void tracking::detection_process()
       //cTo.insert(q_unit); //only for simulation
       geometry_msgs::TransformStamped pose_target = toMoveit(cMo, "camera_color_optical_frame" , "handeye_target");
       br.sendTransform(pose_target);
-
       
       geometry_msgs::Pose cTo_P;
       cTo_P = visp_bridge::toGeometryMsgsPose(cMo); 
@@ -1052,74 +916,10 @@ void tracking::detection_process()
       loop_t = vpTime::measureTimeMs() - t;
       times_vec.push_back(loop_t);
 
-
-      if (learn_position) {
-        double train_t = vpTime::measureTimeMs();
-
-        learn_cpt ++;
-        
-        // Detect keypoints on the current image
-        std::vector<cv::KeyPoint> trainKeyPoints;
-        keypoint.detect(I_color, trainKeyPoints);
-
-        // Keep only keypoints on the object
-        std::vector<vpPolygon> polygons;
-        std::vector<std::vector<vpPoint> > roisPt;
-        std::pair<std::vector<vpPolygon>, std::vector<std::vector<vpPoint> > > pair = tracker->getPolygonFaces();
-        polygons = pair.first;
-        roisPt = pair.second;
-
-        // Compute the 3D coordinates
-        std::vector<cv::Point3f> points3f;
-        vpKeyPoint::compute3DForPointsInPolygons(cMo, cam_color, trainKeyPoints, polygons, roisPt, points3f);
-
-        // Build the reference keypoints
-        keypoint.buildReference(I_color, trainKeyPoints, points3f, true, learn_id++);
-
-        // Display saved learned image
-        if (((learn_cpt-1)%4)==0){
-          ILearned.insert(I_color,vpImagePoint(0,0));
-        }
-        else if (((learn_cpt-1)%4)==1){
-          ILearned.insert(I_color,vpImagePoint(0,I_color.getWidth()));
-        }
-        else if (((learn_cpt-1)%4)==2){
-          ILearned.insert(I_color,vpImagePoint(I_color.getHeight(),0)); 
-        }
-        else if (((learn_cpt-1)%4)==3){
-          ILearned.insert(I_color,vpImagePoint(I_color.getHeight(),I_color.getWidth())); 
-        }
-        vpDisplay::display(ILearned);
-        vpDisplay::flush(ILearned);
-
-        learn_position = false;
-        std::cout << "Data learned" << std::endl;
-
-        train_t_vec.push_back(vpTime::measureTimeMs() - train_t);
-      }
-
-
-
     }
 
     //! -----------------------------------------------------------------------------------------------
     //! [END OF LOOP]
-    tracker_visp::angle_velocity angleVel_to_servo;
-    angleVel_to_servo.angle = 90;	//degrees, setup angle
-    angleVel_to_servo.velocity = 0.005; //degrees/ms, velocity fast
-    servoPub.publish(angleVel_to_servo);
-
-    // Terminate learning phase, save all on exit
-    if (opt_learn) {
-      
-      if (learn_cpt>0){
-        std::cout << "Save learning from " << learn_cpt << " images in file: " << opt_learning_data << std::endl;
-        keypoint.saveLearningData(opt_learning_data, true, true);
-      }
-
-    
-    }
-
     if (!times_vec.empty()) {
       tracker_visp::angle_velocity angleVel_to_servo;
       angleVel_to_servo.angle = 90;	//degrees, setup angle
@@ -1127,10 +927,6 @@ void tracking::detection_process()
       servoPub.publish(angleVel_to_servo);
     std::cout << "\nProcessing time, Mean: " << vpMath::getMean(times_vec) << " ms ; Median: " << vpMath::getMedian(times_vec)
               << " ; Std: " << vpMath::getStdev(times_vec) << " ms" << std::endl;
-    }
-    if (!train_t_vec.empty()) {
-    std::cout << "\nTrain:\nProcessing time, Mean: " << vpMath::getMean(train_t_vec) << " ms ; Median: " << vpMath::getMedian(train_t_vec)
-              << " ; Std: " << vpMath::getStdev(train_t_vec) << " ms" << std::endl;
     }
     if (!detect_t_vec.empty()) {
     std::cout << "\nDetection:\nProcessing time, Mean: " << vpMath::getMean(detect_t_vec) << " ms ; Median: " << vpMath::getMedian(detect_t_vec)
