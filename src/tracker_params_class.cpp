@@ -81,20 +81,22 @@ void tracking::init_parameters()
 {
   tracker_visp::angle_velocity angleVel_to_servo;
   angleVel_to_servo.angle = 90;	//degrees, setup angle
-  angleVel_to_servo.velocity = 0.005; //degrees/ms, velocity fast
+  angleVel_to_servo.velocity = rot_speed*3; //degrees/ms, velocity fast
   servoPub.publish(angleVel_to_servo);
   //Settings  
   tracker_path = ros::package::getPath("tracker_visp");
   opt_config = tracker_path + "/trackers/jenga_tracker_params.xml";
-  opt_model = tracker_path + "/model/jenga_single.cao";
-  opt_init = tracker_path + "/model/jenga_single.init";
+  node_handle.param<std::string>("model",opt_model,"jenga_single.cao");
+  opt_model= tracker_path + "/model/" + opt_model;
+  node_handle.param<std::string>("init",opt_init,"jenga_single.init");
+  opt_init = tracker_path + "/model/" + opt_init;    
   opt_learning_data = tracker_path + "/learning/1/data-learned.bin";
   opt_keypoint_config = tracker_path + "/learning/keypoint_config.xml";
   opt_learn = true;
   opt_auto_init = false;
-  opt_init_clicks = true;
+  node_handle.param("init_clicks",opt_init_clicks,false);
   learn_position = false;
-  opt_yolact_init = false;
+  node_handle.param("yolact_init",opt_yolact_init,false);
 
   // [Realsense camera configuration]
   config.enable_stream(RS2_STREAM_COLOR, width, height, RS2_FORMAT_RGBA8, fps);
@@ -196,8 +198,8 @@ void tracking::learning_process()
 
   // Define tracker types
   
-  // trackerTypes.push_back(vpMbGenericTracker::EDGE_TRACKER | vpMbGenericTracker::KLT_TRACKER);
-  trackerTypes.push_back(vpMbGenericTracker::EDGE_TRACKER);
+  trackerTypes.push_back(vpMbGenericTracker::EDGE_TRACKER | vpMbGenericTracker::KLT_TRACKER);
+  // trackerTypes.push_back(vpMbGenericTracker::EDGE_TRACKER);
   if (opt_use_depth){    
     trackerTypes.push_back(vpMbGenericTracker::DEPTH_DENSE_TRACKER);
   }
@@ -463,14 +465,14 @@ void tracking::learning_process()
         // SERVO SEND ANGLE
         vpThetaUVector cTo_tu = cMo.getThetaUVector();
         tracker_visp::angle_velocity angleVel_to_servo;
-        angleVel_to_servo.velocity = 0.005; //degrees/ms, velocity slow
+        angleVel_to_servo.velocity = rot_speed; //degrees/ms, velocity slow
         // std::cout << "Theta: \n" << angle << std::endl;
         if (cTo_tu[1]<0){	//radians, "right face seen from camera"
-          angleVel_to_servo.angle = 130;	//degrees, final angle
+          angleVel_to_servo.angle = 135;	//degrees, final angle
           servoPub.publish(angleVel_to_servo);
         }
         else {	//radians, "left face seen from camera"
-          angleVel_to_servo.angle = 50;	//degrees, final angle
+          angleVel_to_servo.angle = 45;	//degrees, final angle
           servoPub.publish(angleVel_to_servo);
         }
         rotated = true; 
@@ -923,7 +925,7 @@ void tracking::detection_process()
     if (!times_vec.empty()) {
       tracker_visp::angle_velocity angleVel_to_servo;
       angleVel_to_servo.angle = 90;	//degrees, setup angle
-      angleVel_to_servo.velocity = 0.005; //degrees/ms, velocity fast
+      angleVel_to_servo.velocity = rot_speed*3; //degrees/ms, velocity fast
       servoPub.publish(angleVel_to_servo);
     std::cout << "\nProcessing time, Mean: " << vpMath::getMean(times_vec) << " ms ; Median: " << vpMath::getMedian(times_vec)
               << " ; Std: " << vpMath::getStdev(times_vec) << " ms" << std::endl;

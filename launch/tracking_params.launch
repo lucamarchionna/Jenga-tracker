@@ -1,0 +1,17 @@
+<?xml version="1.0" ?>
+<launch>
+    <arg name="model" value="jenga_single.cao" />
+    <arg name="init" value="jenga_single.init" />    
+    <arg name="init_clicks" value="false" />
+    <arg name="yolact_init" value="true" />        
+
+    <!-- Starts the learning configuration and tracking consecutively  -->
+   
+    <node name="tracker_params" pkg="tracker_visp" type="detection" output="screen">
+       <param name="model" value="$(arg model)" />
+       <param name="init" value="$(arg init)" />       
+       <param name="init_clicks" value="$(arg init_clicks)" />
+       <param name="yolact_init" value="$(arg yolact_init)" />              
+    </node> 
+         
+</launch>

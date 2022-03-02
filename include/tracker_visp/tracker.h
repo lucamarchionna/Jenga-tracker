@@ -15,10 +15,6 @@
 #include <visp3/vision/vpKeyPoint.h>
 
 // TEMP
-#include <visp3/io/vpVideoWriter.h>
-#include <visp3/core/vpImageDraw.h>
-#include <visp3/core/vpFont.h>
-// TEMP
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 
@@ -84,15 +80,13 @@ class tracking
 
         vpHomogeneousMatrix cMo, cTo, eeTc, eeTc1, wTee, depth_M_color, wTc, wTc1, bTee;
 
-        double opt_learn, opt_auto_init, opt_proj_error_threshold{35.0}, opt_setGoodME_thresh{0.5};
+        double opt_learn, opt_auto_init, opt_proj_error_threshold{35.0}, opt_setGoodME_thresh{0.5},rot_speed{0.005};
         int opt_disp_visibility{0}, width{640}, height{480}, fps{30};
         bool opt_display_projection_error{false}, opt_display_features{true}, opt_display_model{true}, opt_yolact_init{false}, opt_init_clicks{true}, learn_position{true}, rotated{false}, opt_use_depth{true};
         vpRotationMatrix cdRo;
         vpKeyPoint keypoint;
         vpMbGenericTracker *tracker;
         std::vector<int> trackerTypes;
-        vpVideoWriter writer;
-
 
         vpRealSense2 realsense;
         vpImage<vpRGBa> I_color, ILearned, I_depth_color; 
