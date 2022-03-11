@@ -79,6 +79,7 @@ void tracking::learningCallback(const std_msgs::Bool::ConstPtr& msg)
 
 void tracking::init_parameters()
 {
+  node_handle.getParam("/detection/rot_speed",rot_speed);
   tracker_visp::angle_velocity angleVel_to_servo;
   angleVel_to_servo.angle = 90;	//degrees, setup angle
   angleVel_to_servo.velocity = rot_speed*3; //degrees/ms, velocity fast
@@ -86,17 +87,20 @@ void tracking::init_parameters()
   //Settings  
   tracker_path = ros::package::getPath("tracker_visp");
   opt_config = tracker_path + "/trackers/jenga_tracker_params.xml";
-  node_handle.param<std::string>("model",opt_model,"jenga_single.cao");
-  opt_model= tracker_path + "/model/" + opt_model;
-  node_handle.param<std::string>("init",opt_init,"jenga_single.init");
-  opt_init = tracker_path + "/model/" + opt_init;    
+  node_handle.getParam("/detection/model", opt_model);  
+  opt_model= tracker_path + "/model/" + "jenga_zEnd.cao";
+  node_handle.getParam("/detection/init", opt_init);    
+  opt_init = tracker_path + "/model/" + "jenga_zEnd.init";  
   opt_learning_data = tracker_path + "/learning/1/data-learned.bin";
   opt_keypoint_config = tracker_path + "/learning/keypoint_config.xml";
   opt_learn = true;
   opt_auto_init = false;
-  node_handle.param("init_clicks",opt_init_clicks,false);
-  learn_position = false;
-  node_handle.param("yolact_init",opt_yolact_init,false);
+  // opt_init_clicks = true;
+  node_handle.getParam("/detection/init_clicks", opt_init_clicks);      
+  learn_position = true;
+  // node_handle.param("/yolact_init",opt_yolact_init,false);
+  // opt_yolact_init = false;
+  node_handle.getParam("/detection/yolact_init", opt_yolact_init);   
 
   // [Realsense camera configuration]
   config.enable_stream(RS2_STREAM_COLOR, width, height, RS2_FORMAT_RGBA8, fps);
@@ -334,6 +338,9 @@ void tracking::learning_process()
 
   std::vector<double> times_vec;
   std::vector<double> train_t_vec;
+
+  double track_time = vpTime::measureTimeSecond();
+  double final_time = 0;
   
   try {
     
@@ -378,7 +385,6 @@ void tracking::learning_process()
       // Run the tracker
       try {
         if(opt_use_depth){
-          cout << "---TRACK---" << endl;  
             tracker->track(mapOfImages, mapOfPointclouds, mapOfWidths, mapOfHeights);
         }
         else
@@ -452,8 +458,12 @@ void tracking::learning_process()
         if (button == vpMouseButton::button3) {
           quit = true;
         } else if (button == vpMouseButton::button1 && opt_learn) {
-          learn_position = true;
+            learn_position = true;
         }
+          else if (button == vpMouseButton::button2){
+            quit = true;
+            final_time = vpTime::measureTimeSecond();
+          }
       }
       if (opt_use_depth && vpDisplay::getClick(I_depth_color, false)) {
         quit = true;
@@ -563,6 +573,11 @@ void tracking::learning_process()
 
     
     }
+
+    if (final_time == 0){
+      final_time = vpTime::measureTimeSecond();
+    }
+    std::cout << "Tracking time measured: " << final_time - track_time << " s" << std::endl; 
 
     if (!times_vec.empty()) {
     std::cout << "\nProcessing time, Mean: " << vpMath::getMean(times_vec) << " ms ; Median: " << vpMath::getMedian(times_vec)
@@ -680,6 +695,9 @@ void tracking::detection_process()
 
   std::vector<double> times_vec;
   std::vector<double> detect_t_vec;
+
+  double track_time = vpTime::measureTimeSecond();
+  double final_time = 0;
   
   try {
     
@@ -909,6 +927,10 @@ void tracking::detection_process()
         } else if (button == vpMouseButton::button1 && opt_auto_init && !opt_learn) {
           run_auto_init = true;
         }
+          else if (button == vpMouseButton::button2){
+            quit = true;
+            final_time = vpTime::measureTimeSecond();
+          }
       }
       if (opt_use_depth && vpDisplay::getClick(I_depth_color, false)) {
         quit = true;
@@ -922,6 +944,11 @@ void tracking::detection_process()
 
     //! -----------------------------------------------------------------------------------------------
     //! [END OF LOOP]
+    if (final_time == 0){
+      final_time = vpTime::measureTimeSecond();
+    }
+    std::cout << "Tracking time measured: " << final_time - track_time << " s" << std::endl; 
+
     if (!times_vec.empty()) {
       tracker_visp::angle_velocity angleVel_to_servo;
       angleVel_to_servo.angle = 90;	//degrees, setup angle
