@@ -112,16 +112,16 @@ def to_RestartFirstLayerResponse(found_top):
 class Yolact_full_service():
   def __init__(self):
     self.msg_image=None
-    # self.cam_width=640
-    # self.cam_height=480    
-    # self.width=480
-    # self.height=480
-    self.cam_width=1280
-    self.cam_height=720    
-    self.width=720
-    self.height=720    
+    self.cam_width=640
+    self.cam_height=480    
+    self.width=480
+    self.height=480
+    # self.cam_width=1280
+    # self.cam_height=720    
+    # self.width=720
+    # self.height=720    
     self.pose_window_name="-POSE-:c:choose,esc:exit"   
-    self.pose_imshow=np.zeros((self.width,self.height*2,3),dtype=np.uint8)
+    self.pose_imshow=np.zeros((self.height,self.width*2,3),dtype=np.uint8)
     self.init_window_name="-INIT-:c:choose,esc:exit"
     self.first_imshow=np.zeros((self.height,self.width*3,3),dtype=np.uint8)
     #Init stuff to enable POSE loop
@@ -133,8 +133,8 @@ class Yolact_full_service():
     self.rosPath=rosPath
     self.yolact_path=yolact_path
 
-    self.cfg_name='yolact_resnet101_jenga_dataset_new_config'
-    self.weights_path=os.path.join(self.yolact_path,'weights/yolact_resnet101_jenga_dataset_new_1199_180000.pth')
+    self.cfg_name='yolact_plus_resnet50_jenga_dataset_final_config'
+    self.weights_path=os.path.join(self.yolact_path,'weights/yolact_plus_resnet50_jenga_dataset_final_41_4800.pth')
 
     ##### Setup #####
     if torch.cuda.is_available():
@@ -187,14 +187,14 @@ class Yolact_full_service():
     # %%
     ### CROP IMAGE TO BE SQUARE
     hhh,www,_=color_image.shape
-    width_offset=int(www-hhh)/2
+    width_offset=int((www-hhh)/2)
     # img=color_image[int(hhh/2)-240:int(hhh/2)+240,int(www/2)-240:int(www/2)+240]
-    img=color_image[int(hhh/2)-self.height/2:int(hhh/2)+self.height/2,int(www/2)-self.width/2:int(www/2)+self.width/2]
+    img=color_image[int(hhh/2)-int(self.height/2):int(hhh/2)+int(self.height/2),int(www/2)-int(self.width/2):int(www/2)+int(self.width/2)]
     self.first_imshow=np.hstack((img,np.zeros((self.height,self.width,3),dtype=np.uint8),np.zeros((self.height,self.width,3),dtype=np.uint8)))    
 
     # %%
     # Detection
-    classes, scores, boxes, masks = self.compute_outputs(img,0.3)
+    classes, scores, boxes, masks = self.compute_outputs(img,0.92)
     print("Detected --> ",len(masks))
 
     # %%
@@ -306,9 +306,9 @@ class Yolact_full_service():
 
     #Draw frame axes on image
     img_big=np.zeros((self.cam_height,self.cam_width,3),dtype=np.uint8)
-    img_big[:,width_offset:self.cam_width-width_offset]=img_all_masks.copy()
+    img_big[:,width_offset:(self.cam_width-width_offset)]=img_all_masks.copy()
     img_big=cv2.drawFrameAxes(img_big,cam_mtx,cam_dist,rvec_first,tvec_first,0.03,thickness=3)
-    self.first_imshow=np.hstack((img,img_big[:,width_offset:self.cam_width-width_offset],top_masks))
+    self.first_imshow=np.hstack((img,img_big[:,width_offset:(self.cam_width-width_offset)],top_masks))
 
     first_layer_number=18
 
@@ -403,7 +403,7 @@ class Yolact_full_service():
     ## Convert messages into opencv formats
     msg_image=req.image
     cam_info=req.camInfo
-    tvec_est=np.array([0,0,0],dtype=np.float)
+    tvec_est=np.array([0,0,0], dtype=float)
     tvec_est[0]=req.cTo_est.pose.pose.position.x
     tvec_est[1]=req.cTo_est.pose.pose.position.y
     tvec_est[2]=req.cTo_est.pose.pose.position.z
@@ -425,13 +425,14 @@ class Yolact_full_service():
     # %%
     ### CROP IMAGE TO BE SQUARE
     hhh,www,_=color_image.shape
-    width_offset=int(www-hhh)/2
-    img=color_image[int(hhh/2)-240:int(hhh/2)+240,int(www/2)-240:int(www/2)+240]
+    width_offset=int((www-hhh)/2)
+    # img=color_image[int(hhh/2)-240:int(hhh/2)+240,int(www/2)-240:int(www/2)+240]
+    img=color_image[int(hhh/2)-int(self.height/2):int(hhh/2)+int(self.height/2),int(www/2)-int(self.width/2):int(www/2)+int(self.width/2)]
     self.pose_imshow=np.hstack((img,np.zeros(img.shape,dtype=np.uint8)))
 
     # %%
     # Detection
-    classes, scores, boxes, masks = self.compute_outputs(img,0.3)
+    classes, scores, boxes, masks = self.compute_outputs(img,0.92)
     print("Detected --> ",len(masks))
 
     # %%
@@ -503,9 +504,9 @@ class Yolact_full_service():
 
     #Draw estimated block pose on image
     img_big=np.zeros((self.cam_height,self.cam_width,3),dtype=np.uint8)
-    img_big[:,width_offset:self.cam_width-width_offset]=img_all_masks.copy()
+    img_big[:,width_offset:(self.cam_width-width_offset)]=img_all_masks.copy()
     img_big=cv2.drawFrameAxes(img_big,cam_mtx,cam_dist,rvec_est,tvec_est,0.03,thickness=2)
-    img_all_masks=img_big[:,width_offset:self.cam_width-width_offset].copy()
+    img_all_masks=img_big[:,width_offset:(self.cam_width-width_offset)].copy()
     self.pose_imshow=np.hstack((img,img_all_masks))
 
     print("Search from policy")
@@ -548,7 +549,7 @@ class Yolact_full_service():
       ##
       if (k==27):
         rospy.loginfo("SERVICE HALTED BY USER")
-        self.pose_imshow=np.zeros((self.width,self.height*2,3),dtype=np.uint8)
+        self.pose_imshow=np.zeros((self.height,self.width*2,3),dtype=np.uint8)
         self.in_pose_service=False
         return to_PoseEstimationResponse("")
       if (k==ord('c')):
@@ -585,9 +586,9 @@ class Yolact_full_service():
     tvec,rvec=chosen_blocks_group.initPose_file_write(width_offset,initPose_file_name,cam_mtx,cam_dist)
     #Draw frame axes on image
     img_big=np.zeros(color_image.shape,dtype=np.uint8)
-    img_big[:,width_offset:self.cam_width-width_offset]=masked_group.copy()
+    img_big[:,width_offset:(self.cam_width-width_offset)]=masked_group.copy()
     img_big=cv2.drawFrameAxes(img_big,cam_mtx,cam_dist,rvec,tvec,0.04,thickness=2)
-    self.pose_imshow=np.hstack((img_all_masks,img_big[:,width_offset:self.cam_width-width_offset]))
+    self.pose_imshow=np.hstack((img_all_masks,img_big[:,width_offset:(self.cam_width-width_offset)]))
     # %%
     rospy.loginfo("---\nSUCCESFULLY ENDED\n---")
     self.in_pose_service=False

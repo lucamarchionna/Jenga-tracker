@@ -1,14 +1,17 @@
 <?xml version="1.0" ?>
 <launch>
-    <arg name="X_6toc" value="0.057" />
-    <arg name="Y_6toc" value="-0.0328" />
+    <arg name="r_speed" value="0.003" />
+    
+    <arg name="X_6toc" value="0.0565" />
+    <arg name="Y_6toc" value="-0.0350" />
 
     <param name="X_extr_value" type = "double" value="$(eval -1.0*arg('Y_6toc'))"/>
     <param name="Y_extr_value" type = "double" value="$(arg X_6toc)"/>
 
-    <node pkg="tracker_visp" type="Yolact_full_server.py" name="full_segmentation" />
-    
+    <!-- <node pkg="tracker_visp" type="convergenceTime_test.py" name="Convergence_time" /> -->
+
     <node pkg="tracker_visp" type="visualServo" name="pbvs_node" respawn="true" output = "screen">
+        <param name="rot_speed" value="$(arg r_speed)" />
         <param name="X_extr" value="$(eval -1.0*arg('Y_6toc'))" />
         <param name="Y_extr" value="$(arg X_6toc)" />
     </node>

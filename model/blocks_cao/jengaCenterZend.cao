@@ -19,7 +19,7 @@ V1
 4 0 4 5 3           name=occluded #bottom
 4 0 1 7 4           name=occluded #left
 4 1 2 6 7           name=occluded #top
-4 4 7 6 5           name=visible #rear
+4 4 7 6 5           name=occluded #rear
 4 0 3 2 1           name=visible #front
 # 3D cylinders
 0                  # Number of cylinders

@@ -270,6 +270,7 @@ class Blocks_group():
         return self.startIdx,self.upIdx,self.downIdx,self.rightIdx,self.leftIdx
 
     def draw_masked_group(self,img):
+        area_threshold = 0.4
         self.masked_group=img.copy()
         if self.startIdx!=-1:
             self.masked_group=self.start_block.draw_masked_approx(img)
@@ -311,15 +312,15 @@ class Blocks_group():
             self.masked_group=self.left0_block.draw_corners(self.masked_group)
         if self.leftIdx[1]!=-1:
             self.masked_group=self.left1_block.draw_corners(self.masked_group)
-        if self.up1Idx!=-1 and self.up1_block.block_type=="front_face":
+        if self.up1Idx!=-1 and self.up1_block.block_type=="front_face" and (abs(self.up1_block.area-self.start_block.area)/self.up1_block.area)<area_threshold:
             self.masked_group=self.up1_block.draw_corners(self.masked_group)            
-        if self.up1left0Idx!=-1 and self.up1left0_block.block_type=="front_face":
+        if self.up1left0Idx!=-1 and self.up1left0_block.block_type=="front_face" and (abs(self.up1left0_block.area-self.start_block.area)/self.up1left0_block.area)<area_threshold:
             self.masked_group=self.up1left0_block.draw_corners(self.masked_group)
-        if self.up1right0Idx!=-1 and self.up1right0_block.block_type=="front_face":
+        if self.up1right0Idx!=-1 and self.up1right0_block.block_type=="front_face" and (abs(self.up1right0_block.area-self.start_block.area)/self.up1right0_block.area)<area_threshold:
             self.masked_group=self.up1right0_block.draw_corners(self.masked_group)  
-        if self.up1left1Idx!=-1 and self.up1left1_block.block_type=="front_face":
+        if self.up1left1Idx!=-1 and self.up1left1_block.block_type=="front_face" and (abs(self.up1left1_block.area-self.start_block.area)/self.up1left1_block.area)<area_threshold:
             self.masked_group=self.up1left1_block.draw_corners(self.masked_group)
-        if self.up1right1Idx!=-1 and self.up1right1_block.block_type=="front_face":
+        if self.up1right1Idx!=-1 and self.up1right1_block.block_type=="front_face" and (abs(self.up1right1_block.area-self.start_block.area)/self.up1right1_block.area)<area_threshold:
             self.masked_group=self.up1right1_block.draw_corners(self.masked_group)                        
 
         return self.masked_group
@@ -630,6 +631,7 @@ class Blocks_group():
     def initPose_file_write(self,width_offset,initPose_name,cam_mtx,cam_dist):
         self.init_objp=[]
         self.init_impt=[]
+        area_threshold=0.4
 
         def ordered_objp(target_move):
             ordered_objp=[self.target_corner0,self.target_corner1,self.target_corner2,self.target_corner3]
@@ -677,23 +679,23 @@ class Blocks_group():
             ordered_corners=self.up1_block.ordered_corners()
             if len(ordered_corners)>0:
                 self.init_impt.append(ordered_corners)
-                self.init_objp.append(ordered_objp(self.target_move_up1))
-        if self.up1left0Idx!=-1 and self.up1left0_block.block_type=="front_face":
+                self.init_objp.append(ordered_objp(self.target_move_up1)) 
+        if self.up1left0Idx!=-1 and self.up1left0_block.block_type=="front_face" and (abs(self.up1left0_block.area-self.start_block.area)/self.up1left0_block.area)<area_threshold:
             ordered_corners=self.up1left0_block.ordered_corners()
             if len(ordered_corners)>0:
                 self.init_impt.append(ordered_corners)
                 self.init_objp.append(ordered_objp(self.target_move_up1left0))
-        if self.up1left1Idx!=-1 and self.up1left1_block.block_type=="front_face":
+        if self.up1left1Idx!=-1 and self.up1left1_block.block_type=="front_face" and (abs(self.up1left1_block.area-self.start_block.area)/self.up1left1_block.area)<area_threshold:
             ordered_corners=self.up1left1_block.ordered_corners()
             if len(ordered_corners)>0:
                 self.init_impt.append(ordered_corners)
                 self.init_objp.append(ordered_objp(self.target_move_up1left1))       
-        if self.up1right0Idx!=-1 and self.up1right0_block.block_type=="front_face":
+        if self.up1right0Idx!=-1 and self.up1right0_block.block_type=="front_face" and (abs(self.up1right0_block.area-self.start_block.area)/self.up1right0_block.area)<area_threshold:
             ordered_corners=self.up1right0_block.ordered_corners()
             if len(ordered_corners)>0:
                 self.init_impt.append(ordered_corners)
                 self.init_objp.append(ordered_objp(self.target_move_up1right0))
-        if self.up1right1Idx!=-1 and self.up1right1_block.block_type=="front_face":
+        if self.up1right1Idx!=-1 and self.up1right1_block.block_type=="front_face" and (abs(self.up1right1_block.area-self.start_block.area)/self.up1right1_block.area)<area_threshold:
             ordered_corners=self.up1right1_block.ordered_corners()
             if len(ordered_corners)>0:
                 self.init_impt.append(ordered_corners)

@@ -15,6 +15,8 @@ visual_servoing::visual_servoing(ros::NodeHandle& nh) : node_handle(nh), s(vpFea
   servoPub = node_handle.advertise<tracker_visp::angle_velocity>("/servo", 1);
   lastPose = node_handle.advertise<geometry_msgs::Pose>("/lastPose", 1);
   pub_cartesian = node_handle.advertise<geometry_msgs::PoseStamped>("/cartesian", 1);
+  pubThresholdForce = node_handle.advertise<std_msgs::Float32>("/threshold_force", 1);
+  pubConvergenceTime = node_handle.advertise<std_msgs::Bool>("/convergence_time_test", 1);
 
   subLearning = node_handle.subscribe("/tracker_params/learning_phase", 1, &visual_servoing::learningCallback, this);
   subForce = node_handle.subscribe("/retract", 1, &visual_servoing::forceCallback, this);
@@ -99,15 +101,23 @@ void visual_servoing::estimationCallback(const geometry_msgs::Pose& tracker_pose
 
         take_cTo = false;
         lastPoseReceived = tracker_pose_P;
+        static tf2_ros::StaticTransformBroadcaster br_static;
+        vpHomogeneousMatrix last_pose = visp_bridge::toVispHomogeneousMatrix(tracker_pose_P); 
+        geometry_msgs::TransformStamped lastPoseReceived_msg = toMoveit(last_pose, "camera_color_optical_frame" , "handeye_target2");
+        br_static.sendTransform(lastPoseReceived_msg);  
         distance_run = lastPoseReceived.position.z - camTtarget[2][3];
+        baseTtarget = homogeneousTransformation("edo_base_link", "handeye_target2");
+
+        convTime.data = true;
+        pubConvergenceTime.publish(convTime);
+        vpDisplay::flush(I_color);
       }
 
       else {    
+        vpDisplay::flush(I_color);
         block_axis = true;
 
         distance_run = lastPoseReceived.position.z - camTtarget[2][3];
-
-        cout << distance_run <<endl;
 
         if (distance_run < threshold_pose && retract == false )  {
           signPoseReceived = 1.0; 
@@ -117,6 +127,18 @@ void visual_servoing::estimationCallback(const geometry_msgs::Pose& tracker_pose
           if (distance_run > threshold_pose/2) {
             velocityData.twist.linear.y = velocityData.twist.linear.y + zig_zag[run_iter];
             run_iter = run_iter + 1;
+
+            if (!updated_threshold) {
+
+              std_msgs::Float32 msg_force;
+
+              msg_force.data = 1.2*default_force;
+
+              pubThresholdForce.publish(msg_force);
+
+              updated_threshold = true;
+
+            }
 
             if (run_iter == 4) {
               run_iter = 0;
@@ -141,6 +163,8 @@ void visual_servoing::estimationCallback(const geometry_msgs::Pose& tracker_pose
           retract = true;
         }
 
+        vpDisplay::flush(I_color);
+
       }
     }
   }
@@ -149,6 +173,23 @@ void visual_servoing::estimationCallback(const geometry_msgs::Pose& tracker_pose
 
 }
 
+double visual_servoing::computeFinalPull(tracker_visp::location block)
+{
+  if (block.position == "dx") {
+    finalPull = -0.03;
+  }
+
+  else if (block.position == "sx") {
+    finalPull = 0.03;
+  }
+
+  else {
+    finalPull = 0.00;
+  }
+
+  cout << " block has position " << block.position << " and finalPull is " << finalPull << endl;
+  return finalPull;
+}
 void visual_servoing::forceCallback(const std_msgs::BoolConstPtr& retract_call) 
 {
   retract = retract_call->data;
@@ -321,6 +362,7 @@ void visual_servoing::learningCallback(const std_msgs::Bool::ConstPtr& msg)
 
 void visual_servoing::init_startLoop()
 {
+  node_handle.getParam("/pbvs_node/rot_speed", rot_speed);
   tracker_visp::angle_velocity angleVel_to_servo;
   angleVel_to_servo.angle = 90;	//degrees, setup angle
   angleVel_to_servo.velocity = 0.015; //degrees/ms, velocity fast
@@ -358,8 +400,8 @@ void visual_servoing::init_startLoop()
   mapOfHeights["Camera2"] = height;
 
   // [Configuration of display]
-  width = 1280;
-  height = 720;
+  width = 640;
+  height = 480;
   fps = 30;
   
   I_color.init(height, width);
@@ -374,8 +416,8 @@ void visual_servoing::init_startLoop()
     d2.init(I_depth_color, _posx, _posy + I_gray.getHeight()+10, "Depth stream");
 
   geometry_msgs::PoseStamped default_pose;
-  default_pose.pose.position.x = 0.1;
-  default_pose.pose.position.z = 0.7;
+  default_pose.pose.position.x = 0.08;
+  default_pose.pose.position.z = 0.63;
 
   node_handle.getParam("/pbvs_node/X_extr", X_extr);
   node_handle.getParam("/pbvs_node/Y_extr", Y_extr);
@@ -411,7 +453,7 @@ void visual_servoing::init_startLoop()
   task.setLambda(lambda);
   // Servo data
   error = 5;
-  threshold = 0.00002;
+  threshold = 0.0000020;  //0.000020;
   block_axis = false;
   vitesse = 0.0002;
   rapport = 0;  
@@ -432,7 +474,7 @@ void visual_servoing::init_shortLoop()
 
   geometry_msgs::PoseStamped default_pose;
   default_pose.pose.position.x = 0.08;
-  default_pose.pose.position.z = 0.7;
+  default_pose.pose.position.z = 0.63;
   pub_cartesian.publish(default_pose);
 
   // [Acquire stream and initialize displays]
@@ -499,11 +541,7 @@ void visual_servoing::init_shortLoop()
     }
   }
 
-<<<<<<< HEAD
   pub_cartesian.publish(default_pose);
-=======
-  pub_cartesian.publish(default_pose); 
->>>>>>> d590bcdd17d0d05cd1df51f73e51ddb5466b9525
 
   tracker = new vpMbGenericTracker(trackerTypes);
   
@@ -519,7 +557,7 @@ void visual_servoing::init_shortLoop()
 
   // Force good moving edges ratio threshold
   tracker->setGoodMovingEdgesRatioThreshold(opt_setGoodME_thresh);  //default=0.4
-  tracker->setDepthDenseFilteringMinDistance(0.3);
+  tracker->setDepthDenseFilteringMinDistance(0.20);
 
   // Remove faces with name "occluded" from the tracking, a priori
   tracker->setUseEdgeTracking("occluded",false);
@@ -532,6 +570,8 @@ void visual_servoing::init_shortLoop()
 
   rotated = false;
   initialize_visualservoing = false;
+
+  keypoint.reset();
 }
 
 void visual_servoing::reinit_vs(vpHomogeneousMatrix cMo_copy) {
@@ -572,7 +612,7 @@ void visual_servoing::reinit_vs(vpHomogeneousMatrix cMo_copy) {
   s_tu.buildFrom(cdTc);
   task.setServo(vpServo::EYEINHAND_CAMERA);
   error = 5;
-  threshold = 0.00002;
+  threshold = 0.000020;
   block_axis = false;
 
 }
@@ -630,7 +670,7 @@ void visual_servoing::init_servo()
   }
 
   error = 5;
-  threshold = 0.00002;
+  threshold = 0.000020;
   block_axis = false;
   vitesse = 0.0002;
   rapport = 0;
@@ -641,6 +681,7 @@ void visual_servoing::init_servo()
 
 void visual_servoing::learning_process() 
 {
+  opt_proj_error_threshold = 35.0;
   ILearned.init(I_color.getHeight()*2,I_color.getWidth()*2);
   d3.init(ILearned, _posx+I_color.getWidth()*2+10, _posy, "Learned-images");
   
@@ -658,8 +699,7 @@ void visual_servoing::learning_process()
   }
 
   // Directory to store learning data
-  if (vpIoTools::checkDirectory(vpIoTools::getParent(opt_learning_data)))
-    vpIoTools::remove(vpIoTools::getParent(opt_learning_data));
+  vpIoTools::remove(vpIoTools::getParent(opt_learning_data));
   vpIoTools::makeDirectory(vpIoTools::getParent(opt_learning_data));
 
   // [INITIALIZE WITH YOLACT]
@@ -697,6 +737,9 @@ void visual_servoing::learning_process()
 
       if (opt_model!=""){
         block_choice = srv_cao.response.initPose.location;
+
+        finalPull = computeFinalPull(block_choice);
+        
 
         cout << "The chosen block is " << block_choice << endl; 
 
@@ -736,12 +779,15 @@ void visual_servoing::learning_process()
     
     eeTc1.buildFrom(t1, q_1);
     wTc1 = wTc*eeTc1.inverse();
+
+    double t_initial = vpTime::measureTimeMs();
     
     //! [LOOP]
     //! -----------------------------------------------------------------------------------------------
     while (!quit && node_handle.ok() ) {
       
       double t = vpTime::measureTimeMs();
+       
       bool tracking_failed = false;
       double elapsedTime = 0;
 
@@ -815,7 +861,7 @@ void visual_servoing::learning_process()
         {
           std::stringstream ss;
           if (!times_vec.empty()){
-            ss << "Mean fps:" << 1.0/vpMath::getMean(times_vec); 
+            ss << "Mean fps:" << 1000/vpMath::getMean(times_vec); 
             vpDisplay::displayText(I_color, I_color.getHeight() - 80, 20, ss.str(), vpColor::red);
           }
         }        
@@ -845,14 +891,17 @@ void visual_servoing::learning_process()
           learn_position = true;
       }
 
-      //Rotating base to learn from it
-      if (!rotated && !tracking_failed) {
-        ros::Duration(2.0).sleep();        
+      double t_rotating = vpTime::measureTimeMs();
 
+      //Rotating base to learn from it
+      if (!rotated && !tracking_failed && (t_rotating > t_initial + 1500.0)) {
+
+        cout << "t_rotating is " << t_rotating << " and t_initial is " << t_initial << endl;
+        
       // SERVO SEND ANGLE
         vpThetaUVector cTo_tu = cMo.getThetaUVector();
         tracker_visp::angle_velocity angleVel_to_servo;
-        angleVel_to_servo.velocity = 0.003; //degrees/ms, velocity slow
+        angleVel_to_servo.velocity = rot_speed; //degrees/ms, velocity slow
         if (cTo_tu[1]<0){	//radians, "right face seen from camera"
           angleVel_to_servo.angle = 135;	//degrees, final angle
           servoPub.publish(angleVel_to_servo);
@@ -969,8 +1018,9 @@ void visual_servoing::learning_process()
 
 void visual_servoing::detection_process() 
 {
+  opt_proj_error_threshold = 20.0;
   
-    if (vpIoTools::checkFilename(opt_learning_data)){
+  if (vpIoTools::checkFilename(opt_learning_data)){
     keypoint.loadLearningData(opt_learning_data, true);
   }
   else {
@@ -1121,10 +1171,13 @@ void visual_servoing::detection_process()
             init_matrices();
             init_servo();
             initialize_visualservoing = true;
+            convTime.data = false;
+            pubConvergenceTime.publish(convTime);
           }
 
         cMo = tracker->getPose();
         cMo_old = cMo;
+
 
       }
 
@@ -1155,7 +1208,7 @@ void visual_servoing::detection_process()
         {
           std::stringstream ss;
           if (!times_vec.empty()){
-            ss << "Mean fps:" << 1.0/vpMath::getMean(times_vec); 
+            ss << "Mean fps:" << 1000/vpMath::getMean(times_vec); 
             vpDisplay::displayText(I_color, I_color.getHeight() - 80, 20, ss.str(), vpColor::red);
           }
         }   
@@ -1212,6 +1265,7 @@ void visual_servoing::detection_process()
           new_block = srv_force.response.NewBlock;
 
           if (!new_block.position.empty()) {
+            finalPull = computeFinalPull(new_block);
         
             if (f_max) {
               translX_policy = toBlocktransl(new_block);
@@ -1221,6 +1275,8 @@ void visual_servoing::detection_process()
               retract = false;
               f_max = false;
               run_completed = false;
+              updated_threshold = false;
+
             }
 
             else {
@@ -1234,6 +1290,11 @@ void visual_servoing::detection_process()
             quit = true;
           }
         }
+        std_msgs::Float32 msg_force;
+
+        msg_force.data = default_force;
+
+        pubThresholdForce.publish(msg_force); 
         go_to_service = false;
 
       }

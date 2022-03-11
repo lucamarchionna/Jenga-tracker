@@ -53,6 +53,7 @@
 #include <std_msgs/Bool.h>
 #include <std_msgs/String.h>
 #include <std_msgs/UInt16.h>
+#include <std_msgs/Float32.h>
 
 
 using namespace std;
@@ -76,6 +77,7 @@ class visual_servoing
         void learningCallback(const std_msgs::Bool::ConstPtr& msg);
         void forceCallback(const std_msgs::BoolConstPtr& retract_call);
         double toBlocktransl(tracker_visp::location block);
+        double computeFinalPull(tracker_visp::location block);
         
 
         vpHomogeneousMatrix homogeneousTransformation(string link1, string link2);
@@ -136,7 +138,7 @@ class visual_servoing
         vpFeatureTranslation s_star;
         vpFeatureThetaU s_tu;
         vpFeatureThetaU s_tu_star;
-        bool firstAddFeatures{true}, initialize_visualservoing{false};
+        bool firstAddFeatures{true}, initialize_visualservoing{false}, updated_threshold{false};
         vpPoint point, point_des2;
         vpFeaturePoint ps, point_des;
         vpFeaturePoint p[4], pd[4];
@@ -154,19 +156,21 @@ class visual_servoing
         //positionbased_vs::InitialGuess service;
         double threshold, threshold_pose{0.10};
         double vitesse;
-        double rapport, zig_zag[4]{0.007, 0.0, -0.007, 0.00}, X_extr{0}, Y_extr{0};
+        double rapport, finalPull{0.0}, zig_zag[4]{0.0065, 0.0, -0.0065, 0.00}, X_extr{0}, Y_extr{0}, default_force{0.32};
         bool block_axis{false}, take_cTo{true}, retract{false}, go_to_service{true};
         float signPoseReceived{1.0}, signPullX{1.0}, distance_run{0.1};
+        std_msgs::Bool convTime;
         vpColVector v_ee(unsigned int n), omega_ee(unsigned int n), v_cam, v(unsigned int n), e1, proj_e1;
 
 
         edo_core_msgs::JointControlArray jnt_ctrl;
         //const vpException &e;
         
+        double rot_speed{0.003};
         
-        ros::Publisher pub, lastPose, pub_cartesian;
-        double opt_learn, opt_auto_init, opt_proj_error_threshold{35.0}, opt_setGoodME_thresh{0.4};
-        int opt_disp_visibility{0}, width{1280}, height{720}, fps{30}, run_iter{0};
+        ros::Publisher pub, lastPose, pub_cartesian, pubThresholdForce, pubConvergenceTime ;
+        double opt_learn, opt_auto_init, opt_proj_error_threshold{40.0}, opt_setGoodME_thresh{0.4};
+        int opt_disp_visibility{0}, width{640}, height{480}, fps{30}, run_iter{0};
         bool opt_display_projection_error{false}, opt_display_features{false}, opt_display_model{true}, opt_yolact_init{true}, opt_pose_init{true}, learn_position{true}, rotated{false}, f_max{false}, run_completed{false}, opt_use_depth{false};
         bool opt_display_depth{false};
         vpRotationMatrix cdRo;
