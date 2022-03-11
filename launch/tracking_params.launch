@@ -1,0 +1,19 @@
+<?xml version="1.0" ?>
+<launch>
+    <arg name="rot_sp" value="0.005" />
+    <arg name="mod" value="jenga_zEnd.cao" />
+    <arg name="in" value="jenga_zEnd.init" />    
+    <arg name="in_clicks" value="true" />
+    <arg name="yol_init" value="false" />        
+
+    <!-- Starts the learning configuration and tracking consecutively  -->
+   
+    <node name="detection" pkg="tracker_visp" type="detection" output="screen">
+       <param name="rot_speed" value="$(arg rot_sp)" />
+       <param name="model" value="$(arg mod)" />
+       <param name="init" value="$(arg in)" />       
+       <param name="init_clicks" value="$(arg in_clicks)" />
+       <param name="yolact_init" value="$(arg yol_init)" />              
+    </node> 
+         
+</launch>
