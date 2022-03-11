@@ -412,6 +412,9 @@ void tracking::learning_process()
         tracking_failed = true;
       }
 
+      if(tracking_failed)
+        final_time=vpTime::measureTimeSecond();
+
       // Display tracking results
       if (!tracking_failed) {
         // Turn display features on
@@ -695,6 +698,7 @@ void tracking::detection_process()
 
   std::vector<double> times_vec;
   std::vector<double> detect_t_vec;
+  std::vector<double> track_t_vec;
 
   double track_time = vpTime::measureTimeSecond();
   double final_time = 0;
@@ -769,6 +773,7 @@ void tracking::detection_process()
           }
           std::cout << "Detection succeed in elapsed time: " << vpTime::measureTimeMs() - detect_t << " ms" << std::endl;
           detect_t_vec.push_back(vpTime::measureTimeMs() - detect_t);
+          track_time=vpTime::measureTimeSecond();
         } 
         else {
           vpDisplay::flush(I_color);
@@ -856,6 +861,11 @@ void tracking::detection_process()
         tracking_failed = true;
       }
 
+      if(tracking_failed){
+        final_time=vpTime::measureTimeSecond();
+        track_t_vec.push_back(final_time-track_time);
+      }
+
       // Display tracking results
       if (!tracking_failed) {
         // Turn display features on
@@ -927,10 +937,6 @@ void tracking::detection_process()
         } else if (button == vpMouseButton::button1 && opt_auto_init && !opt_learn) {
           run_auto_init = true;
         }
-          else if (button == vpMouseButton::button2){
-            quit = true;
-            final_time = vpTime::measureTimeSecond();
-          }
       }
       if (opt_use_depth && vpDisplay::getClick(I_depth_color, false)) {
         quit = true;
@@ -944,10 +950,14 @@ void tracking::detection_process()
 
     //! -----------------------------------------------------------------------------------------------
     //! [END OF LOOP]
-    if (final_time == 0){
-      final_time = vpTime::measureTimeSecond();
-    }
-    std::cout << "Tracking time measured: " << final_time - track_time << " s" << std::endl; 
+    if (!track_t_vec.empty()) {
+      std::cout << "\n Track vector time in detection " << std::endl;
+      for(int i=0;i<track_t_vec.size;i++){
+        std::cout << track_t_vec[i] << std::endl; 
+      }
+    std::cout << "\nDetection:\Tracking time, Mean: " << vpMath::getMean(track_t_vec) << " ms ; Median: " << vpMath::getMedian(track_t_vec)
+              << " ; Std: " << vpMath::getStdev(track_t_vec) << " ms" << std::endl;
+    }    
 
     if (!times_vec.empty()) {
       tracker_visp::angle_velocity angleVel_to_servo;
